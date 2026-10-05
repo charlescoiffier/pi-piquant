@@ -1,5 +1,5 @@
 import { strings, type Dict } from './i18n';
-import { MAX_COUNT, MAX_SPEED, MIN_SPEED, SPEED_STOPS, type Params } from './state';
+import { LENGTH_STOPS, MAX_COUNT, MAX_SPEED, MIN_SPEED, SPEED_STOPS, WIDTH_STOPS, type Params } from './state';
 
 export interface PanelActions {
   get(): Params;
@@ -94,35 +94,49 @@ export function createPanel(host: El, a: PanelActions) {
   };
 
   /**
-   * Champ numérique libre + curseur à crans (un cran par valeur de `stops`, échelle logarithmique
-   * puisque les crans sont en 1-2-5). Le curseur se cale sur le cran le plus proche de la valeur saisie.
+   * Champ numérique libre + curseur à crans.
+   *  - `stops` : un cran par valeur de la liste (échelle logarithmique si les valeurs suivent une
+   *    suite 1-2-5) ; le curseur se cale sur le cran le plus proche de la valeur saisie.
+   *  - `every` : curseur linéaire au pas `step`, avec un repère tous les `every`.
+   * Les repères sont dessinés sous la piste ; le champ accepte toute valeur de min à max.
    */
-  const detents = (value: number, stops: number[], min: number, max: number, on: (v: number) => void) => {
+  type Notches = { min: number; max: number; step: number; stops?: number[]; every?: number };
+  const notched = (value: number, o: Notches, on: (v: number) => void) => {
+    const { min, max, step, stops, every } = o;
     const nearest = (v: number) =>
-      stops.reduce((best, s, i) => (Math.abs(Math.log(s / v)) < Math.abs(Math.log(stops[best] / v)) ? i : best), 0);
+      stops!.reduce((best, s, i) => (Math.abs(Math.log(s / v)) < Math.abs(Math.log(stops![best] / v)) ? i : best), 0);
+    const toSlider = (v: number) => String(stops ? nearest(v) : v);
+    const fromSlider = (raw: string) => (stops ? stops[Number(raw)] : Number(raw));
+    const count = stops ? stops.length : Math.round((max - min) / every!) + 1;
+    const clamp = (x: number) => Math.min(max, Math.max(min, x));
+    const round = (x: number) => Math.round(x * 1000) / 1000;
+
     const wrap = h('div', { class: 'num' });
-    const n = h('input', { type: 'number', min: String(min), max: String(max), step: '1', value: String(Math.round(value)) }) as HTMLInputElement;
-    const r = h('input', { type: 'range', min: '0', max: String(stops.length - 1), step: '1', value: String(nearest(value)) }) as HTMLInputElement;
-    r.setAttribute('aria-valuetext', String(Math.round(value)));
+    const n = h('input', { type: 'number', min: String(min), max: String(max), step: String(step), value: String(round(value)) }) as HTMLInputElement;
+    const r = h('input', {
+      type: 'range',
+      min: stops ? '0' : String(min),
+      max: stops ? String(stops.length - 1) : String(max),
+      step: stops ? '1' : String(Math.max(step, 1)),
+      value: toSlider(value),
+    }) as HTMLInputElement;
     const ticks = h('div', { class: 'ticks', 'aria-hidden': 'true' });
-    for (const s of stops) ticks.append(h('span', { title: String(s) }));
+    for (let i = 0; i < count; i++) ticks.append(h('span'));
     r.addEventListener('input', () => {
-      const v = stops[Number(r.value)];
-      n.value = String(v);
-      r.setAttribute('aria-valuetext', String(v));
+      const v = fromSlider(r.value);
+      n.value = String(round(v));
       on(v);
     });
     n.addEventListener('input', () => {
       const x = Number(n.value);
       if (n.value === '' || !Number.isFinite(x)) return;
-      const v = Math.min(max, Math.max(min, x));
-      r.value = String(nearest(v));
+      const v = clamp(x);
+      r.value = toSlider(v);
       on(v);
     });
-    // à la sortie du champ, afficher la valeur réellement appliquée (bornée à min..max, entière)
+    // à la sortie du champ, afficher la valeur réellement appliquée (bornée à min..max)
     n.addEventListener('change', () => {
-      const x = Math.round(Math.min(max, Math.max(min, Number(n.value) || min)));
-      n.value = String(x);
+      n.value = String(round(clamp(Number(n.value) || min)));
     });
     wrap.append(n, h('div', { class: 'stops' }, r, ticks));
     return wrap;
@@ -222,8 +236,8 @@ export function createPanel(host: El, a: PanelActions) {
       ...(p.source === 'text' || p.source === 'image'
         ? [] // texte et image : toujours converti en entier (aucune troncature)
         : [field(t.count, num(p.count, 1, MAX_COUNT, 1, (v) => a.set({ count: Math.round(v) }), false))]),
-      field(t.segLen, num(p.segLen, 1, 100, 0.5, (v) => a.set({ segLen: v }))),
-      field(t.coef, num(p.coef, 0, 360, 0.1, (v) => a.set({ coef: v }))),
+      field(t.segLen, notched(p.segLen, { min: 1, max: 100, step: 0.5, stops: LENGTH_STOPS }, (v) => a.set({ segLen: v }))),
+      field(t.coef, notched(p.coef, { min: 0, max: 360, step: 0.1, every: 36 }, (v) => a.set({ coef: v }))),
       field(t.firstDir, toggle<'1' | '-1'>([['-1', t.ccw], ['1', t.cw]], String(p.firstDir) as '1' | '-1',
         (v) => a.set({ firstDir: v === '-1' ? -1 : 1 }))),
     ));
@@ -239,7 +253,7 @@ export function createPanel(host: El, a: PanelActions) {
         field(t.bg, color(p.bg, (v) => a.set({ bg: v }))),
       ),
       h('label', { class: 'check' }, tt, h('span', {}, t.showTitle)),
-      field(t.strokeWidth, num(p.strokeWidth, 0.1, 10, 0.1, (v) => a.set({ strokeWidth: v }))),
+      field(t.strokeWidth, notched(p.strokeWidth, { min: 0.1, max: 10, step: 0.1, stops: WIDTH_STOPS }, (v) => a.set({ strokeWidth: v }))),
       button(dark ? t.light : t.dark, () => {
         a.set(dark ? { bg: '#ffffff', stroke: '#111111' } : { bg: '#111111', stroke: '#f2f2f2' });
         build();
@@ -257,7 +271,7 @@ export function createPanel(host: El, a: PanelActions) {
           return b;
         })(),
       ),
-      field(t.speed, detents(p.speed, SPEED_STOPS, MIN_SPEED, MAX_SPEED, (v) => a.set({ speed: v }))),
+      field(t.speed, notched(p.speed, { min: MIN_SPEED, max: MAX_SPEED, step: 1, stops: SPEED_STOPS }, (v) => a.set({ speed: v }))),
     ));
 
     // Vue

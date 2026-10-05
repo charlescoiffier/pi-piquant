@@ -1,5 +1,5 @@
 # Publie l'application sur GitLab Pages à chaque push sur la branche par défaut.
-# URL : https://<utilisateur>.gitlab.io/pi-piquant/
+# URL : voir Deploy > Pages (domaine unique du type https://pi-piquant-xxxxxx.gitlab.io/)
 pages:
   image: node:22-alpine
   stage: deploy

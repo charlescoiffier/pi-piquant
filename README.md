@@ -3,7 +3,7 @@
 Réinterprétation web des œuvres « pi-piquant » de François Morellet : une suite de chiffres
 (décimales de π par défaut) devient un tracé de segments égaux, dont les angles sont dictés par les chiffres.
 
-**Application en ligne :** https://charlescoiffier.gitlab.io/pi-piquant/
+**Application en ligne :** https://pi-piquant-b69e0d.gitlab.io/
 
 ## Conversions réversibles (texte et image)
 
