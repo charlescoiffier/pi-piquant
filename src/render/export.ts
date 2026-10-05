@@ -5,8 +5,8 @@ export interface ExportInput {
   points: Float64Array;
   bounds: Bounds;
   style: DrawStyle;
-  /** Légende imprimée sous le tracé (null = aucune). */
-  title?: string | null;
+  /** Lignes de légende imprimées sous le tracé (null = aucune). */
+  title?: string[] | null;
   /** Nom de fichier sans extension. */
   fileBase: string;
 }
@@ -19,10 +19,14 @@ function framing(inp: ExportInput) {
   const minY = inp.bounds.minY - p;
   const w = Math.max(inp.bounds.maxX - inp.bounds.minX + 2 * p, 1e-6);
   const drawH = Math.max(inp.bounds.maxY - inp.bounds.minY + 2 * p, 1e-6);
-  // bandeau de légende sous le dessin (texte à 1,8 % du grand côté)
-  const fontSize = inp.title ? Math.max(w, drawH) * 0.018 : 0;
-  const band = fontSize * 3.2;
-  return { minX, minY, w, h: drawH + band, drawH, fontSize, baseline: minY + drawH + fontSize * 2 };
+  // bandeau de légende sous le dessin : 1re ligne à 1,8 % du grand côté, les suivantes à 85 %
+  const lines = inp.title?.length ?? 0;
+  const fontSize = lines ? Math.max(w, drawH) * 0.018 : 0;
+  const gap = fontSize * 1.4;
+  const band = lines ? fontSize * 3.1 + gap * (lines - 1) : 0;
+  const baselines = Array.from({ length: lines }, (_, i) => minY + drawH + fontSize * 1.9 + gap * i);
+  const sizes = Array.from({ length: lines }, (_, i) => (i === 0 ? fontSize : fontSize * 0.85));
+  return { minX, minY, w, h: drawH + band, drawH, fontSize, gap, baselines, sizes };
 }
 
 function download(blob: Blob, name: string) {
@@ -45,12 +49,12 @@ export async function exportPng(inp: ExportInput, longSide: number, name = `${in
   const ctx = canvas.getContext('2d')!;
   const n = inp.points.length / 2 - 1;
   drawPath(ctx, inp.points, n, inp.style, k, -f.minX * k, -f.minY * k, cw, ch);
-  if (inp.title) {
+  inp.title?.forEach((line, i) => {
     ctx.fillStyle = inp.style.stroke;
-    ctx.font = `${f.fontSize * k}px Helvetica, Arial, sans-serif`;
+    ctx.font = `${f.sizes[i] * k}px Helvetica, Arial, sans-serif`;
     ctx.textBaseline = 'alphabetic';
-    ctx.fillText(inp.title, (inp.bounds.minX - f.minX) * k, (f.baseline - f.minY) * k);
-  }
+    ctx.fillText(line, (inp.bounds.minX - f.minX) * k, (f.baselines[i] - f.minY) * k);
+  });
   const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, 'image/png'));
   if (blob) download(blob, name);
 }
@@ -65,9 +69,9 @@ export function exportSvg(inp: ExportInput, name = `${inp.fileBase}.svg`) {
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${r(f.minX)} ${r(f.minY)} ${r(f.w)} ${r(f.h)}" width="100%" height="100%" preserveAspectRatio="xMidYMid meet">` +
     `<rect x="${r(f.minX)}" y="${r(f.minY)}" width="${r(f.w)}" height="${r(f.h)}" fill="${inp.style.bg}"/>` +
     `<polyline fill="none" stroke="${inp.style.stroke}" stroke-width="${inp.style.strokeWidth}" stroke-linejoin="round" stroke-linecap="round" points="${pts.join(' ')}"/>` +
-    (inp.title
-      ? `<text x="${r(inp.bounds.minX)}" y="${r(f.baseline)}" font-family="Helvetica, Arial, sans-serif" font-size="${r(f.fontSize)}" fill="${inp.style.stroke}">${esc(inp.title)}</text>`
-      : '') +
+    (inp.title ?? [])
+      .map((line, i) => `<text x="${r(inp.bounds.minX)}" y="${r(f.baselines[i])}" font-family="Helvetica, Arial, sans-serif" font-size="${r(f.sizes[i])}" fill="${inp.style.stroke}">${esc(line)}</text>`)
+      .join('') +
     `</svg>`;
   download(new Blob([svg], { type: 'image/svg+xml' }), name);
 }
@@ -102,19 +106,24 @@ export async function exportPdf(inp: ExportInput, name = `${inp.fileBase}.pdf`) 
   for (let i = 0; i < n; i++) {
     rel.push([(inp.points[(i + 1) * 2] - inp.points[i * 2]) * k, (inp.points[(i + 1) * 2 + 1] - inp.points[i * 2 + 1]) * k]);
   }
-  if (inp.title) {
-    // Les polices PDF standard n'ont pas « π » : le titre est rendu en image haute résolution.
-    const px = 64;
+  if (inp.title?.length) {
+    // Les polices PDF standard n'ont pas « π » : la légende est rendue en image haute résolution.
+    const px = 64; // taille de la 1re ligne en pixels du canvas
+    const font = (i: number) => `${f.sizes[i] / f.fontSize * px}px Helvetica, Arial, sans-serif`;
+    const y0 = px * 1.05;
     const c = document.createElement('canvas');
     const cx = c.getContext('2d')!;
-    cx.font = `${px}px Helvetica, Arial, sans-serif`;
-    c.width = Math.ceil(cx.measureText(inp.title).width) + 8;
-    c.height = Math.ceil(px * 1.4);
-    cx.font = `${px}px Helvetica, Arial, sans-serif`;
-    cx.fillStyle = inp.style.stroke;
-    cx.fillText(inp.title, 4, px * 1.05);
+    let widest = 0;
+    inp.title.forEach((line, i) => { cx.font = font(i); widest = Math.max(widest, cx.measureText(line).width); });
+    c.width = Math.ceil(widest) + 8;
+    c.height = Math.ceil(y0 + px * 1.4 * (inp.title.length - 1) + px * 0.35);
+    inp.title.forEach((line, i) => {
+      cx.font = font(i);
+      cx.fillStyle = inp.style.stroke;
+      cx.fillText(line, 4, y0 + px * 1.4 * i);
+    });
     const s = (f.fontSize * k) / px; // mm par pixel du canvas
-    doc.addImage(c.toDataURL('image/png'), 'PNG', inp.bounds.minX * k + ox - 4 * s, f.baseline * k + oy - px * 1.05 * s, c.width * s, c.height * s, undefined, 'FAST');
+    doc.addImage(c.toDataURL('image/png'), 'PNG', inp.bounds.minX * k + ox - 4 * s, f.baselines[0] * k + oy - y0 * s, c.width * s, c.height * s, undefined, 'FAST');
   }
   if (rel.length) doc.lines(rel, inp.points[0] * k + ox, inp.points[1] * k + oy, [1, 1], 'S', false);
   download(doc.output('blob'), name);

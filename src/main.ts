@@ -6,7 +6,8 @@ import { Viewport } from './render/viewport';
 import { exportParams, exportPdf, exportPng, exportSvg, type ExportInput } from './render/export';
 import { createPanel } from './ui/panel';
 import { strings } from './ui/i18n';
-import { makeFileBase, makeTitle } from './ui/title';
+import { createInfo } from './ui/info';
+import { makeFileBase, makeSubtitle, makeTitle } from './ui/title';
 import { DEFAULTS, decodeParams, encodeParams, sanitize, type Params } from './ui/state';
 
 const fromHash = () => {
@@ -43,12 +44,13 @@ const viewport = new Viewport(app, () => draw());
 const caption = document.createElement('div');
 caption.className = 'caption';
 app.append(caption);
-const titleText = () => (params.showTitle && digits.length ? makeTitle(params, digits.length) : null);
+const titleLines = () => (params.showTitle && digits.length ? [makeTitle(params, digits.length), makeSubtitle(params.lang)] : null);
 function updateCaption() {
-  const t = titleText();
-  if (caption.textContent !== (t ?? '')) {
-    caption.textContent = t ?? '';
-    document.title = t ?? 'π-piquant';
+  const lines = titleLines();
+  const text = lines ? lines.join('\n') : '';
+  if (caption.textContent !== text) {
+    caption.textContent = text;
+    document.title = lines ? lines[0] : 'π-piquant';
   }
 }
 
@@ -166,7 +168,7 @@ async function loadImage(file: File) {
 }
 
 // --- exports -------------------------------------------------------------
-const exportInput = (): ExportInput => ({ points: path.points, bounds: path, style: params, title: titleText(), fileBase: makeFileBase(params, digits.length) });
+const exportInput = (): ExportInput => ({ points: path.points, bounds: path, style: params, title: titleLines(), fileBase: makeFileBase(params, digits.length) });
 const shareUrl = () => `${location.origin}${location.pathname}#p=${encodeParams(params)}`;
 
 const panel = createPanel(app, {
@@ -201,7 +203,10 @@ const panel = createPanel(app, {
     }
   },
   hasImage: () => image !== null,
+  openInfo: () => info.open(),
 });
+
+const info = createInfo(app, () => params.lang);
 
 addEventListener('keydown', (e) => {
   if (e.key === 'h' && !(e.target as HTMLElement).closest('input,textarea,select')) {

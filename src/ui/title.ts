@@ -18,6 +18,9 @@ export function makeTitle(p: Params, digitCount: number): string {
   return `${NAMES[p.source][p.lang]}-piquant • 1 = ${fmt(p.coef)}° • ${fmt(digitCount)} ${unit}`;
 }
 
+/** Seconde ligne de la légende. */
+export const makeSubtitle = (lang: Lang) => (lang === 'fr' ? 'd’après François Morellet' : 'after François Morellet');
+
 const SLUGS: Record<Params['source'], string> = {
   pi: 'pi', e: 'e', phi: 'phi', sqrt2: 'sqrt2', free: 'chiffres', text: 'texte', image: 'image',
 };

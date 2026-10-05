@@ -5,7 +5,7 @@ import { textDigits } from '../src/digits/text';
 import { imageDigits, traversalOrder } from '../src/digits/image';
 import { freeDigits } from '../src/digits/free';
 import { embeddedDigits } from '../src/digits/embedded';
-import { makeFileBase, makeTitle } from '../src/ui/title';
+import { makeFileBase, makeSubtitle, makeTitle } from '../src/ui/title';
 import { decodeParams, DEFAULTS, encodeParams } from '../src/ui/state';
 
 const str = (d: Uint8Array) => Array.from(d).join('');
@@ -75,6 +75,8 @@ describe('titre', () => {
   it('π-piquant • 1 = 10° • 1 000 décimales + nom de fichier', () => {
     const t = makeTitle({ ...DEFAULTS, coef: 10, lang: 'fr' }, 1000);
     expect(t.replace(/\s/g, ' ')).toBe('π-piquant • 1 = 10° • 1 000 décimales');
+    expect(makeSubtitle('fr')).toBe('d’après François Morellet');
+    expect(makeSubtitle('en')).toBe('after François Morellet');
     expect(makeFileBase({ ...DEFAULTS, coef: 10 }, 500)).toBe('pi-piquant_10deg_500dec');
   });
 });

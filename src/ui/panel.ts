@@ -16,6 +16,7 @@ export interface PanelActions {
   saveJson(): void;
   loadJson(file: File): void;
   hasImage(): boolean;
+  openInfo(): void;
 }
 
 type El = HTMLElement;
@@ -254,7 +255,10 @@ export function createPanel(host: El, a: PanelActions) {
     ));
 
     statusEl = h('p', { class: 'status', role: 'status' }, status);
-    body.append(statusEl);
+    const info = button('i', () => a.openInfo(), 'info');
+    info.title = t.info.label;
+    info.setAttribute('aria-label', t.info.label);
+    body.append(h('div', { class: 'foot' }, statusEl, info));
   }
 
   build();
