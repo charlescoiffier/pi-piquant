@@ -14,7 +14,15 @@ const fromHash = () => {
   return m ? decodeParams(m[1]) : null;
 };
 
-let params: Params = fromHash() ?? { ...DEFAULTS, lang: navigator.language.startsWith('fr') ? 'fr' : 'en' };
+const randInt = (min: number, max: number) => min + Math.floor(Math.random() * (max - min + 1));
+
+// Sans lien de partage : décimales au hasard (10-200) et angle unitaire entier au hasard (1-90°)
+let params: Params = fromHash() ?? {
+  ...DEFAULTS,
+  count: randInt(10, 200),
+  coef: randInt(1, 90),
+  lang: navigator.language.startsWith('fr') ? 'fr' : 'en',
+};
 let digits: Uint8Array = new Uint8Array(0);
 let path: PathResult = buildPath(digits, params);
 let image: ImageSource | null = null;

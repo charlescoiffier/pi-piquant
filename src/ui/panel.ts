@@ -75,7 +75,7 @@ export function createPanel(host: El, a: PanelActions) {
   };
 
   const num = (value: number, min: number, max: number, step: number, on: (v: number) => void, slider = true) => {
-    const wrap = h('div', { class: 'num' });
+    const wrap = h('div', { class: slider ? 'num' : 'num solo' });
     const n = h('input', { type: 'number', min: String(min), max: String(max), step: String(step), value: String(value) }) as HTMLInputElement;
     const r = h('input', { type: 'range', min: String(min), max: String(max), step: String(step), value: String(value) }) as HTMLInputElement;
     const push = (v: string, src: HTMLInputElement, other: HTMLInputElement) => {
@@ -176,7 +176,7 @@ export function createPanel(host: El, a: PanelActions) {
       );
     } else if (p.source === 'image') {
       srcKids.push(
-        fileButton(t.imageFile, 'image/*', (f) => a.loadImage(f)),
+        h('div', { class: 'right' }, fileButton(t.imageFile, 'image/*', (f) => a.loadImage(f))),
         field(t.imageMode, select<Params['imageMode']>(
           [['quantile', t.quantile], ['fixed', t.fixed], ['hue', t.hue]], p.imageMode, (v) => a.set({ imageMode: v }))),
         field(t.traversal, select<Params['traversal']>(
