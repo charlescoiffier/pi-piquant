@@ -1,6 +1,4 @@
 export type Source = 'pi' | 'e' | 'phi' | 'sqrt2' | 'free' | 'text' | 'image';
-export type TextMode = 'hash' | 'alpha' | 'unicode';
-export type ImageMode = 'quantile' | 'fixed' | 'hue';
 export type Traversal = 'rows' | 'serpentine' | 'spiral' | 'hilbert';
 export type Lang = 'fr' | 'en';
 
@@ -15,8 +13,6 @@ export interface Params {
   bg: string;
   freeDigits: string;
   text: string;
-  textMode: TextMode;
-  imageMode: ImageMode;
   traversal: Traversal;
   showTitle: boolean; // titre à l'écran et dans les exports
   speed: number; // segments par seconde (animation)
@@ -34,8 +30,6 @@ export const DEFAULTS: Params = {
   bg: '#ffffff',
   freeDigits: '1234567890',
   text: 'Morellet',
-  textMode: 'hash',
-  imageMode: 'quantile',
   traversal: 'rows',
   showTitle: true,
   speed: 400,
@@ -82,8 +76,6 @@ export function sanitize(o: Partial<Params> | Record<string, unknown>): Params {
     bg: color(x.bg, d.bg),
     freeDigits: typeof x.freeDigits === 'string' ? x.freeDigits.slice(0, MAX_COUNT) : d.freeDigits,
     text: typeof x.text === 'string' ? x.text.slice(0, 100_000) : d.text,
-    textMode: oneOf(x.textMode, ['hash', 'alpha', 'unicode'], d.textMode),
-    imageMode: oneOf(x.imageMode, ['quantile', 'fixed', 'hue'], d.imageMode),
     traversal: oneOf(x.traversal, ['rows', 'serpentine', 'spiral', 'hilbert'], d.traversal),
     showTitle: x.showTitle !== false,
     speed: clamp(x.speed, 1, 100_000, d.speed),

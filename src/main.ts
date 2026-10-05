@@ -1,6 +1,8 @@
 import './style.css';
 import { buildPath, segmentCount, type PathResult } from './geometry/path';
-import { getDigits, MAX_PIXELS, type ImageSource } from './digits';
+import { getDigits, type ImageSource } from './digits';
+import { fitImageSize } from './digits/image';
+import { TEXT_MAX_BYTES, textBytes } from './digits/text';
 import { Stage } from './render/canvas';
 import { Viewport } from './render/viewport';
 import { exportParams, exportPdf, exportPng, exportSvg, type ExportInput } from './render/export';
@@ -70,7 +72,8 @@ function fitView() {
 
 // --- chiffres ------------------------------------------------------------
 const digitKey = (p: Params) =>
-  JSON.stringify([p.source, p.count, p.freeDigits, p.text, p.textMode, p.imageMode, p.traversal]);
+  // texte et image sont toujours convertis en entier : « count » ne les concerne pas
+  JSON.stringify([p.source, p.source === 'text' || p.source === 'image' ? 0 : p.count, p.freeDigits, p.text, p.traversal]);
 const pathKey = (p: Params) => JSON.stringify([p.segLen, p.coef, p.firstDir]);
 
 function rebuildPath(refit = true) {
@@ -80,6 +83,14 @@ function rebuildPath(refit = true) {
   syncShowAll();
   if (refit) fitView();
   else draw();
+}
+
+/** Message d'état propre au texte et à l'image (troncature, réduction), vide sinon. */
+function contentStatus(): string {
+  const t = strings(params.lang);
+  if (params.source === 'text' && textBytes(params.text) > TEXT_MAX_BYTES) return t.textTruncated.replace('{n}', TEXT_MAX_BYTES.toLocaleString(params.lang));
+  if (params.source === 'image' && image) return t.imageSize.replace('{w}', String(image.w)).replace('{h}', String(image.h));
+  return '';
 }
 
 async function reloadDigits() {
@@ -100,7 +111,7 @@ async function reloadDigits() {
     digits = d;
     shown = playing ? 0 : d.length;
     rebuildPath();
-    panel.setStatus('');
+    panel.setStatus(contentStatus());
   } catch (e) {
     if (gen !== generation || (e as Error).name === 'AbortError') return;
     panel.setStatus(t.error + (e as Error).message);
@@ -151,9 +162,7 @@ function togglePlay() {
 // --- image ---------------------------------------------------------------
 async function loadImage(file: File) {
   const bmp = await createImageBitmap(file);
-  const k = Math.min(1, Math.sqrt(MAX_PIXELS / (bmp.width * bmp.height)));
-  const w = Math.max(1, Math.round(bmp.width * k));
-  const h = Math.max(1, Math.round(bmp.height * k));
+  const { w, h } = fitImageSize(bmp.width, bmp.height);
   const c = document.createElement('canvas');
   c.width = w;
   c.height = h;
@@ -161,7 +170,6 @@ async function loadImage(file: File) {
   ctx.drawImage(bmp, 0, 0, w, h);
   image = { rgba: ctx.getImageData(0, 0, w, h).data, w, h };
   bmp.close();
-  update({ count: Math.min(100_000, w * h) });
   window.clearTimeout(debounce);
   await reloadDigits();
   panel.rebuild();

@@ -170,27 +170,23 @@ export function createPanel(host: El, a: PanelActions) {
       const ta = h('textarea', { rows: '3' }) as HTMLTextAreaElement;
       ta.value = p.text;
       ta.addEventListener('input', () => a.set({ text: ta.value }));
-      srcKids.push(
-        field(t.textLabel, ta),
-        field(t.textMode, select<Params['textMode']>(
-          [['hash', t.hash], ['alpha', t.alpha], ['unicode', t.unicode]], p.textMode, (v) => a.set({ textMode: v }))),
-      );
+      srcKids.push(field(t.textLabel, ta), h('p', { class: 'hint' }, t.textHint));
     } else if (p.source === 'image') {
       srcKids.push(
         h('div', { class: 'right' }, fileButton(t.imageFile, 'image/*', (f) => a.loadImage(f))),
-        field(t.imageMode, select<Params['imageMode']>(
-          [['quantile', t.quantile], ['fixed', t.fixed], ['hue', t.hue]], p.imageMode, (v) => a.set({ imageMode: v }))),
         field(t.traversal, select<Params['traversal']>(
           [['rows', t.rows], ['serpentine', t.serpentine], ['spiral', t.spiral], ['hilbert', t.hilbert]],
           p.traversal, (v) => a.set({ traversal: v }))),
       );
-      if (!a.hasImage()) srcKids.push(h('p', { class: 'hint' }, t.noImage));
+      srcKids.push(h('p', { class: 'hint' }, a.hasImage() ? t.imageHint : t.noImage));
     }
     body.append(section(t.section.source, ...srcKids));
 
     // Tracé
     body.append(section(t.section.trace,
-      field(t.count, num(p.count, 1, MAX_COUNT, 1, (v) => a.set({ count: Math.round(v) }), false)),
+      ...(p.source === 'text' || p.source === 'image'
+        ? [] // texte et image : toujours converti en entier (aucune troncature)
+        : [field(t.count, num(p.count, 1, MAX_COUNT, 1, (v) => a.set({ count: Math.round(v) }), false))]),
       field(t.segLen, num(p.segLen, 1, 100, 0.5, (v) => a.set({ segLen: v }))),
       field(t.coef, num(p.coef, 0, 360, 0.1, (v) => a.set({ coef: v }))),
       field(t.firstDir, toggle<'1' | '-1'>([['-1', t.ccw], ['1', t.cw]], String(p.firstDir) as '1' | '-1',

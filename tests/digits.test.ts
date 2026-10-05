@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { buildPath } from '../src/geometry/path';
 import { eDigits, phiDigits, sqrt2Digits } from '../src/digits/constants';
-import { textDigits } from '../src/digits/text';
-import { imageDigits, traversalOrder } from '../src/digits/image';
+import { decodeText, textDigits, TEXT_MAX_BYTES, textBytes } from '../src/digits/text';
+import { readByte, writeByte } from '../src/digits/bytecode';
+import { decodeImage, fitImageSize, IMAGE_HEADER_DIGITS, IMAGE_MAX_PIXELS, imageDigits, traversalOrder } from '../src/digits/image';
 import { freeDigits } from '../src/digits/free';
 import { embeddedDigits } from '../src/digits/embedded';
 import { makeFileBase, makeSubtitle, makeTitle } from '../src/ui/title';
@@ -81,38 +82,111 @@ describe('titre', () => {
   });
 });
 
-describe('texte', () => {
-  it('hash : distribution quasi uniforme et déterministe', async () => {
-    const d = await textDigits('Morellet', 'hash', 20000);
-    for (const f of hist(d)) expect(Math.abs(f - 0.1)).toBeLessThan(0.012);
-    expect(str(await textDigits('Morellet', 'hash', 50))).toBe(str(d.slice(0, 50)));
+describe('octet ⇄ 3 chiffres', () => {
+  it('permutation : 256 octets → 256 blocs distincts, et relecture exacte', () => {
+    const blocks = new Set<string>();
+    for (let b = 0; b < 256; b++) {
+      const d = new Uint8Array(3);
+      writeByte(d, 0, b);
+      blocks.add(Array.from(d).join(''));
+      expect(readByte(d, 0)).toBe(b);
+    }
+    expect(blocks.size).toBe(256);
   });
-  it('alpha', async () => expect(str(await textDigits('Aé b!', 'alpha', 10))).toBe('152'));
-  it('unicode', async () => expect(str(await textDigits('A', 'unicode', 10))).toBe('65'));
+  it('un bloc qui ne correspond à aucun octet est détecté', () => {
+    const invalid = [0, 0, 0].map(() => 0);
+    let found = false;
+    for (let v = 0; v < 1000 && !found; v++) {
+      const d = [Math.floor(v / 100), Math.floor(v / 10) % 10, v % 10];
+      if (readByte(d, 0) < 0) { found = true; invalid.splice(0, 3, ...d); }
+    }
+    expect(found).toBe(true);
+  });
+  it('répartition équilibrée : les 256 niveaux de gris donnent chaque chiffre à ±1,5 point de 10 %', () => {
+    const d = new Uint8Array(256 * 3);
+    for (let b = 0; b < 256; b++) writeByte(d, b * 3, b);
+    for (const f of hist(d)) expect(Math.abs(f - 0.1)).toBeLessThan(0.015);
+  });
 });
 
-describe('image', () => {
-  const mk = (n: number, f: (i: number) => [number, number, number]) => {
-    const a = new Uint8ClampedArray(n * 4);
-    for (let i = 0; i < n; i++) {
-      const [r, g, b] = f(i);
-      a.set([r, g, b, 255], i * 4);
-    }
+describe('texte réversible', () => {
+  const textes = [
+    'Bonjour',
+    'François Morellet',
+    'é ç œ ß à ï ü',
+    '日本語 · 中文 · 한국어',
+    'Emojis 😀🎨π✨ et 👨‍👩‍👧',
+    'a\nb\tc\r\n',
+    'dezd dksdmwjc kdslncjwkl dn,wcl jkwchjdkm jksmw jckdmsnjdksmw cd,slc kdsmcdksm< nkmdsnck<lmdsncklmdsn<c mndsm',
+    '',
+  ];
+  for (const t of textes) {
+    it(`aller-retour exact : ${JSON.stringify(t).slice(0, 30)}`, () => {
+      const d = textDigits(t);
+      expect(d.length).toBe(textBytes(t) * 3);
+      expect(decodeText(d)).toBe(t);
+    });
+  }
+  it('déterministe, et un même caractère donne toujours les mêmes chiffres', () => {
+    expect(str(textDigits('aba').slice(0, 3))).toBe(str(textDigits('aba').slice(6, 9)));
+    expect(str(textDigits('aba').slice(0, 3))).not.toBe(str(textDigits('aba').slice(3, 6)));
+  });
+  it('aucun chiffre ne domine sur du texte', () => {
+    const d = textDigits('François Morellet a créé les œuvres pi-piquant à partir des décimales de π. '.repeat(20));
+    for (const f of hist(d)) expect(Math.abs(f - 0.1)).toBeLessThan(0.06);
+  });
+  it('limite : coupe à une frontière de caractère, le résultat reste décodable', () => {
+    const long = 'é'.repeat(TEXT_MAX_BYTES); // 2 octets par caractère
+    const d = textDigits(long);
+    expect(d.length).toBeLessThanOrEqual(100_000);
+    const back = decodeText(d);
+    expect(long.startsWith(back)).toBe(true);
+    expect(back.length).toBe(Math.floor(TEXT_MAX_BYTES / 2));
+  });
+  it('chiffres invalides : erreur explicite', () => {
+    expect(() => decodeText([1, 2])).toThrow();
+  });
+});
+
+describe('image réversible (gris 8 bits)', () => {
+  const rgbaOfGray = (gray: number[]) => {
+    const a = new Uint8ClampedArray(gray.length * 4);
+    gray.forEach((g, i) => a.set([g, g, g, 255], i * 4));
     return a;
   };
-  it('quantiles : 10 % par chiffre même sur une image très sombre', () => {
-    const n = 10000;
-    const rgba = mk(n, (i) => { const v = i % 40; return [v, v, v]; });
-    const d = imageDigits(rgba, 100, 100, 'quantile', 'rows');
-    for (const f of hist(d)) expect(f).toBeCloseTo(0.1, 2);
+  for (const t of ['rows', 'serpentine', 'spiral', 'hilbert'] as const) {
+    it(`aller-retour exact, parcours « ${t} » (image 7×5, 35 niveaux dont 0 et 255)`, () => {
+      const gray = Array.from({ length: 35 }, (_, i) => (i * 37 + 3) % 256);
+      gray[0] = 0; gray[34] = 255;
+      const d = imageDigits(rgbaOfGray(gray), 7, 5, t);
+      expect(d.length).toBe(IMAGE_HEADER_DIGITS + 35 * 3);
+      const back = decodeImage(d);
+      expect([back.w, back.h]).toEqual([7, 5]);
+      expect(Array.from(back.gray)).toEqual(gray);
+    });
+  }
+  it('en-tête : largeur, hauteur et parcours en clair', () => {
+    const d = imageDigits(rgbaOfGray([10, 20, 30, 40, 50, 60]), 3, 2, 'spiral');
+    expect(str(d.slice(0, 9))).toBe('000300022');
   });
-  it('paliers fixes : image sombre déséquilibrée (comportement documenté)', () => {
-    const rgba = mk(100, () => [10, 10, 10]);
-    expect(hist(imageDigits(rgba, 10, 10, 'fixed', 'rows'))[0]).toBe(1);
+  it('une image uniformément sombre reste équilibrée en chiffres', () => {
+    const gray = Array.from({ length: 4000 }, (_, i) => i % 60); // niveaux 0-59 seulement
+    const d = imageDigits(rgbaOfGray(gray), 100, 40, 'rows');
+    for (const f of hist(d.slice(IMAGE_HEADER_DIGITS))) expect(Math.abs(f - 0.1)).toBeLessThan(0.04);
   });
-  it('teinte : rouge vif → 0, vert → 3 (120°/36)', () => {
-    const rgba = mk(2, (i) => (i === 0 ? [255, 0, 0] : [0, 255, 0]));
-    expect(str(imageDigits(rgba, 2, 1, 'hue', 'rows'))).toBe('03');
+  it('transparence : composée sur du blanc', () => {
+    const a = new Uint8ClampedArray([0, 0, 0, 0]); // pixel noir totalement transparent → blanc
+    expect(decodeImage(imageDigits(a, 1, 1, 'rows')).gray[0]).toBe(255);
+  });
+  it('trop grande : refus explicite ; fitImageSize ramène dans les limites', () => {
+    expect(() => imageDigits(new Uint8ClampedArray(4), 20_000, 1, 'rows')).toThrow();
+    for (const [w, h] of [[4000, 3000], [30_000, 1], [1, 12_000], [180, 180]]) {
+      const f = fitImageSize(w, h);
+      expect(f.w * f.h).toBeLessThanOrEqual(IMAGE_MAX_PIXELS);
+      expect(Math.max(f.w, f.h)).toBeLessThanOrEqual(9999);
+      expect(f.w).toBeGreaterThanOrEqual(1);
+    }
+    expect(fitImageSize(180, 180)).toEqual({ w: 180, h: 180 });
   });
   it('parcours : permutations complètes', () => {
     for (const t of ['rows', 'serpentine', 'spiral', 'hilbert'] as const) {

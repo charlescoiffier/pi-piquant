@@ -3,7 +3,7 @@ import { piDigits } from './pi';
 import { eDigits, phiDigits, sqrt2Digits } from './constants';
 import { freeDigits } from './free';
 import { textDigits } from './text';
-import { imageDigits, MAX_PIXELS } from './image';
+import { imageDigits } from './image';
 import { embeddedDigits } from './embedded';
 
 export interface ImageSource {
@@ -34,13 +34,9 @@ export async function getDigits(p: Params, ctx: Context): Promise<Uint8Array> {
     case 'free':
       return freeDigits(p.freeDigits, p.count);
     case 'text':
-      return textDigits(p.text, p.textMode, p.count);
-    case 'image': {
-      if (!ctx.image) return new Uint8Array(0);
-      const d = imageDigits(ctx.image.rgba, ctx.image.w, ctx.image.h, p.imageMode, p.traversal);
-      return d.length > p.count ? d.slice(0, p.count) : d;
-    }
+      return textDigits(p.text);
+    case 'image':
+      return ctx.image ? imageDigits(ctx.image.rgba, ctx.image.w, ctx.image.h, p.traversal) : new Uint8Array(0);
   }
 }
 
-export { MAX_PIXELS };

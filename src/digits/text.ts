@@ -1,43 +1,39 @@
-import type { TextMode } from '../ui/state';
+import { DIGITS_PER_BYTE, readByte, writeByte } from './bytecode';
+import { MAX_COUNT } from '../ui/state';
+
+/** Nombre maximal d'octets UTF-8 d'un texte (chaque octet donne 3 chiffres). */
+export const TEXT_MAX_BYTES = Math.floor(MAX_COUNT / DIGITS_PER_BYTE);
+
+const encoder = new TextEncoder();
+
+/** Taille du texte en octets UTF-8. */
+export const textBytes = (text: string) => encoder.encode(text).length;
 
 /**
- * Texte → chiffres.
- * - hash    : SHA-256 en mode compteur + échantillonnage par rejet → distribution quasi parfaite.
- * - alpha   : a=1…z=26 modulo 10 (accents retirés, le reste ignoré) → fidèle mais biaisé.
- * - unicode : points de code écrits en base 10 → fidèle, biais léger.
+ * Texte → chiffres, sans perte : le texte est codé en UTF-8 (tout caractère, tout alphabet,
+ * emojis compris) et chaque octet devient 3 chiffres (voir bytecode.ts).
+ * Au-delà de TEXT_MAX_BYTES, le texte est coupé à une frontière de caractère (jamais au milieu).
  */
-export async function textDigits(text: string, mode: TextMode, count: number): Promise<Uint8Array> {
-  if (mode === 'hash') return hashDigits(text, count);
-  const out: number[] = [];
-  if (mode === 'alpha') {
-    const clean = text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-    for (const ch of clean) {
-      const c = ch.charCodeAt(0);
-      if (c >= 97 && c <= 122) out.push((c - 96) % 10);
-      if (out.length >= count) break;
-    }
-  } else {
-    for (const ch of text) {
-      for (const d of String(ch.codePointAt(0))) out.push(d.charCodeAt(0) - 48);
-      if (out.length >= count) break;
-    }
+export function textDigits(text: string): Uint8Array {
+  const bytes: number[] = [];
+  for (const ch of text) {
+    const b = encoder.encode(ch);
+    if (bytes.length + b.length > TEXT_MAX_BYTES) break;
+    for (const x of b) bytes.push(x);
   }
-  return Uint8Array.from(out.slice(0, count));
+  const out = new Uint8Array(bytes.length * DIGITS_PER_BYTE);
+  bytes.forEach((b, i) => writeByte(out, i * DIGITS_PER_BYTE, b));
+  return out;
 }
 
-async function hashDigits(text: string, count: number): Promise<Uint8Array> {
-  const enc = new TextEncoder();
-  const base = enc.encode(text);
-  const out = new Uint8Array(count);
-  let n = 0;
-  for (let counter = 0; n < count; counter++) {
-    const buf = new Uint8Array(base.length + 4);
-    buf.set(base);
-    new DataView(buf.buffer).setUint32(base.length, counter);
-    const h = new Uint8Array(await crypto.subtle.digest('SHA-256', buf));
-    for (let i = 0; i < h.length && n < count; i++) {
-      if (h[i] < 250) out[n++] = h[i] % 10; // rejet de 250-255 : pas de biais modulo
-    }
+/** Opération inverse : retrouve le texte à partir des chiffres (lève une erreur si invalides). */
+export function decodeText(digits: ArrayLike<number>): string {
+  if (digits.length % DIGITS_PER_BYTE !== 0) throw new Error('Longueur de chiffres invalide');
+  const bytes = new Uint8Array(digits.length / DIGITS_PER_BYTE);
+  for (let i = 0; i < bytes.length; i++) {
+    const b = readByte(digits, i * DIGITS_PER_BYTE);
+    if (b < 0) throw new Error(`Bloc invalide à la position ${i * DIGITS_PER_BYTE}`);
+    bytes[i] = b;
   }
-  return out;
+  return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
 }
