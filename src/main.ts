@@ -242,6 +242,30 @@ const panel = createPanel(app, {
 
 const info = createInfo(app, () => params.lang);
 
+/** Remplace tous les réglages par ceux d'un lien (collé dans l'adresse ou dans la page). */
+async function applyLink(p: Params) {
+  params = p;
+  panel.rebuild();
+  await reloadDigits();
+}
+
+// Coller un lien dans la barre d'adresse de la page déjà ouverte ne change que le fragment : la page ne se recharge pas.
+addEventListener('hashchange', () => {
+  const p = fromHash();
+  if (p) void applyLink(p);
+});
+
+// Coller un lien (Cmd/Ctrl+V) dans la page, hors d'un champ de saisie
+addEventListener('paste', (e) => {
+  if ((e.target as Element | null)?.closest?.('input,textarea,select,[contenteditable]')) return;
+  const text = e.clipboardData?.getData('text/plain').trim() ?? '';
+  const p = decodeParams(text.includes('#') ? text.slice(text.indexOf('#') + 1) : text);
+  if (!p) return;
+  e.preventDefault();
+  history.replaceState(null, '', `${location.pathname}${location.search}#${encodeParams(p)}`);
+  void applyLink(p).then(() => flash(strings(params.lang).linkApplied));
+});
+
 addEventListener('keydown', (e) => {
   if (e.key === 'h' && !(e.target as HTMLElement).closest('input,textarea,select')) {
     document.querySelector('.panel')?.classList.toggle('hidden');

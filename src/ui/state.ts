@@ -55,7 +55,7 @@ export const WIDTH_STOPS = [0.1, 0.2, 0.5, 1, 2, 5, 10];
 
 // --- lien de partage ------------------------------------------------------
 // Format lisible, noms en français : #source=pi&decimales=100&angle=10&sens=horaire
-// Seuls les réglages utiles sont écrits (ceux de la source choisie, et ceux qui diffèrent du défaut).
+// Tous les réglages utiles pour la source choisie sont écrits, valeurs par défaut comprises.
 
 const SOURCE_NAMES: Record<Source, string> = {
   pi: 'pi', e: 'e', phi: 'phi', sqrt2: 'racine2', free: 'chiffres', text: 'texte', image: 'image',
@@ -72,36 +72,40 @@ const num = (v: number) => String(Math.round(v * 1000) / 1000);
 const hex = (c: string) => c.replace('#', '').toLowerCase();
 
 /**
- * Paramètres → fragment d'adresse (sans le « # »). `source`, `angle` et, pour π, e, φ et √2,
- * `decimales` sont toujours écrits : sans lien, l'application tire décimales et angle au hasard,
- * un lien doit donc décrire un état explicite. L'image n'est jamais incluse (trop lourde).
+ * Paramètres → fragment d'adresse (sans le « # »). Le lien décrit **tout l'état** utile pour la source
+ * choisie, valeurs par défaut comprises : il reste donc exact même si les valeurs par défaut changent un jour.
+ * Seuls les réglages sans effet pour la source sont omis (`decimales` pour le texte, `texte` pour π…).
+ * L'image n'est jamais incluse (trop lourde).
  */
 export function encodeParams(p: Params): string {
-  const d = DEFAULTS;
   const parts: [string, string][] = [['source', SOURCE_NAMES[p.source]]];
   if (usesCount(p.source)) parts.push(['decimales', String(p.count)]);
   parts.push(['angle', num(p.coef)]);
-  if (p.source === 'free' && p.freeDigits !== d.freeDigits) parts.push(['chiffres', p.freeDigits]);
-  if (p.source === 'text' && p.text !== d.text) parts.push(['texte', p.text]);
-  if (p.source === 'image' && p.traversal !== d.traversal) parts.push(['parcours', TRAVERSAL_NAMES[p.traversal]]);
-  if (p.segLen !== d.segLen) parts.push(['segment', num(p.segLen)]);
-  if (p.firstDir !== d.firstDir) parts.push(['sens', p.firstDir === 1 ? 'horaire' : 'anti-horaire']);
-  if (p.strokeWidth !== d.strokeWidth) parts.push(['epaisseur', num(p.strokeWidth)]);
-  if (hex(p.stroke) !== hex(d.stroke)) parts.push(['trait', hex(p.stroke)]);
-  if (hex(p.bg) !== hex(d.bg)) parts.push(['fond', hex(p.bg)]);
-  if (p.showTitle !== d.showTitle) parts.push(['titre', p.showTitle ? 'oui' : 'non']);
-  if (p.speed !== d.speed) parts.push(['vitesse', num(p.speed)]);
-  if (p.lang !== d.lang) parts.push(['langue', p.lang]);
+  if (p.source === 'free') parts.push(['chiffres', p.freeDigits]);
+  if (p.source === 'text') parts.push(['texte', p.text]);
+  if (p.source === 'image') parts.push(['parcours', TRAVERSAL_NAMES[p.traversal]]);
+  parts.push(
+    ['segment', num(p.segLen)],
+    ['sens', p.firstDir === 1 ? 'horaire' : 'anti-horaire'],
+    ['epaisseur', num(p.strokeWidth)],
+    ['trait', hex(p.stroke)],
+    ['fond', hex(p.bg)],
+    ['titre', p.showTitle ? 'oui' : 'non'],
+    ['vitesse', num(p.speed)],
+    ['langue', p.lang],
+  );
   return parts.map(([k, v]) => `${k}=${readableEscape(v)}`).join('&');
 }
 
 /**
  * encodeURIComponent, mais les lettres accentuées, guillemets, emojis… restent lisibles dans le lien
- * (les navigateurs les acceptent). Espaces, « & », « = », « # », « % » et caractères de contrôle restent encodés,
+ * (les navigateurs les acceptent), de même que , ; : / ? @. Espaces, « & », « = », « # », « % » et caractères de contrôle restent encodés,
  * ainsi que les espaces insécables et caractères invisibles, qu'on ne saurait pas distinguer à l'œil.
  */
 function readableEscape(v: string): string {
-  return encodeURIComponent(v).replace(/(?:%[89A-F][0-9A-F])+/g, (run) => {
+  return encodeURIComponent(v)
+    .replace(/%(2C|3B|3A|2F|3F|40)/g, (_, h: string) => String.fromCharCode(parseInt(h, 16))) // , ; : / ? @ sans danger dans un fragment
+    .replace(/(?:%[89A-F][0-9A-F])+/g, (run) => {
     const text = decodeURIComponent(run);
     return /[\s\u200b-\u200f\u2028\u2029\u2060\ufeff]/.test(text) ? run : text;
   });

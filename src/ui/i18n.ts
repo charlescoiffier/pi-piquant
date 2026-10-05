@@ -29,7 +29,7 @@ const dict = {
     pngSize: 'Taille PNG (px)',
     png: 'PNG', svg: 'SVG', pdf: 'PDF',
     copyLink: 'Copier lien', saveJson: '↓ JSON', loadJson: '↑ JSON',
-    copied: 'Lien copié', copyFailed: 'Copie impossible : lien dans la barre d’adresse', downloaded: '{f} téléchargé', jsonLoaded: 'Paramètres chargés', loading: 'Chargement de π…', error: 'Erreur : ',
+    copied: 'Lien copié', linkApplied: 'Lien appliqué', copyFailed: 'Copie impossible : lien dans la barre d’adresse', downloaded: '{f} téléchargé', jsonLoaded: 'Paramètres chargés', loading: 'Chargement de π…', error: 'Erreur : ',
     hide: 'Masquer', show: 'Paramètres',
     info: {
       label: 'À propos',
@@ -70,7 +70,7 @@ const dict = {
     pngSize: 'PNG size (px)',
     png: 'PNG', svg: 'SVG', pdf: 'PDF',
     copyLink: 'Copy link', saveJson: '↓ JSON', loadJson: '↑ JSON',
-    copied: 'Link copied', copyFailed: 'Copy failed: link is in the address bar', downloaded: '{f} downloaded', jsonLoaded: 'Settings loaded', loading: 'Loading π…', error: 'Error: ',
+    copied: 'Link copied', linkApplied: 'Link applied', copyFailed: 'Copy failed: link is in the address bar', downloaded: '{f} downloaded', jsonLoaded: 'Settings loaded', loading: 'Loading π…', error: 'Error: ',
     hide: 'Hide', show: 'Settings',
     info: {
       label: 'About',

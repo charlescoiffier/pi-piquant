@@ -213,12 +213,18 @@ describe('divers', () => {
 });
 
 describe('lien de partage lisible', () => {
-  it('tout par défaut : lien minimal, source + décimales + angle', () => {
-    expect(encodeParams({ ...DEFAULTS })).toBe('source=pi&decimales=100&angle=10');
+  const TOUT = 'segment=10&sens=anti-horaire&epaisseur=0.5&trait=111111&fond=ffffff&titre=oui&vitesse=500&langue=fr';
+  it('sans rien modifier, le lien décrit tous les réglages (valeurs par défaut comprises)', () => {
+    expect(encodeParams({ ...DEFAULTS })).toBe('source=pi&decimales=100&angle=10&' + TOUT);
   });
-  it('lien d\'un nombre : pas de texte ni de chiffres libres (réglages sans effet)', () => {
+  it('lien d\'un nombre : tous les réglages utiles, mais pas ceux sans effet (texte, chiffres, parcours)', () => {
     const l = encodeParams({ ...DEFAULTS, text: 'autre texte', freeDigits: '42', traversal: 'spiral', count: 350, coef: 51 });
-    expect(l).toBe('source=pi&decimales=350&angle=51');
+    expect(l).toBe('source=pi&decimales=350&angle=51&' + TOUT);
+    expect(l).not.toMatch(/texte=|chiffres=|parcours=/);
+  });
+  it('sources sans décimales : pas de « decimales », mais le réglage propre à la source', () => {
+    expect(encodeParams({ ...DEFAULTS, source: 'free', freeDigits: '3141' })).toBe('source=chiffres&angle=10&chiffres=3141&' + TOUT);
+    expect(encodeParams({ ...DEFAULTS, source: 'image', traversal: 'spiral' })).toBe('source=image&angle=10&parcours=spirale&' + TOUT);
   });
   it('allers-retours : chaque source avec des réglages non par défaut', () => {
     const base = { ...DEFAULTS, segLen: 20, firstDir: 1 as const, strokeWidth: 2, stroke: '#cc3333', bg: '#111111', showTitle: false, speed: 1000, lang: 'en' as const, coef: 7.5 };
@@ -240,11 +246,11 @@ describe('lien de partage lisible', () => {
   });
   it('les noms sont en français et les valeurs lisibles', () => {
     const l = encodeParams({ ...DEFAULTS, source: 'sqrt2', count: 64, coef: 51, firstDir: 1, stroke: '#CC3333', showTitle: false });
-    expect(l).toBe('source=racine2&decimales=64&angle=51&sens=horaire&trait=cc3333&titre=non');
+    expect(l).toBe('source=racine2&decimales=64&angle=51&segment=10&sens=horaire&epaisseur=0.5&trait=cc3333&fond=ffffff&titre=non&vitesse=500&langue=fr');
   });
   it('texte lisible dans le lien : accents et guillemets conservés, séparateurs encodés', () => {
     const l = encodeParams({ ...DEFAULTS, source: 'text', text: 'François & Co « Morellet »' });
-    expect(l).toBe('source=texte&angle=10&texte=François%20%26%20Co%20«%20Morellet%20»');
+    expect(l).toContain('source=texte&angle=10&texte=François%20%26%20Co%20«%20Morellet%20»&segment=10');
     expect(decodeParams(l)!.text).toBe('François & Co « Morellet »');
   });
   it('espace insécable et caractères invisibles restent encodés (aller-retour exact)', () => {
@@ -253,8 +259,18 @@ describe('lien de partage lisible', () => {
     expect(l).not.toMatch(/[\u00a0\u200d\u2028]/);
     expect(decodeParams(l)!.text).toBe(t);
   });
-  it('le texte d\'exemple n\'est pas répété dans le lien', () => {
-    expect(encodeParams({ ...DEFAULTS, source: 'text' })).toBe('source=texte&angle=10');
+  it('le texte d\'exemple est dans le lien et se relit à l\'identique', () => {
+    const p = { ...DEFAULTS, source: 'text' as const };
+    expect(encodeParams(p)).toContain('texte=Morellet,%20fils%20monstrueux');
+    expect(decodeParams(encodeParams(p))).toEqual(sanitize(p));
+  });
+  it('ponctuation courante lisible, séparateurs toujours encodés', () => {
+    const t = 'a,b;c:d/e?f@g h&i=j#k%l';
+    const l = encodeParams({ ...DEFAULTS, source: 'text', text: t });
+    expect(l).toContain('texte=a,b;c:d/e?f@g%20h%26i%3Dj%23k%25l&');
+    expect(decodeParams(l)!.text).toBe(t);
+  });
+  it('un lien sans le réglage d\'une source retombe sur la valeur par défaut', () => {
     expect(decodeParams('source=texte&angle=10')!.text).toBe(DEFAULTS.text);
   });
   it('lecture tolérante : virgule décimale, couleur courte, # facultatif, % isolé, clés inconnues', () => {
