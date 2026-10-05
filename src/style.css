@@ -104,3 +104,6 @@ button.info {
 .stops input[type=range] { width: 100%; display: block; }
 .ticks { display: flex; justify-content: space-between; padding: 0 7px; margin-top: -1px; pointer-events: none; }
 .ticks span { width: 1px; height: 4px; background: #d2d2d8; }
+
+/* Curseur à crans pleine largeur sous un champ */
+.stops.full { flex: none; margin: -1px 0 6px; }

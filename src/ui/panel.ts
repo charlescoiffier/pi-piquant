@@ -1,5 +1,5 @@
 import { strings, type Dict } from './i18n';
-import { LENGTH_STOPS, MAX_COUNT, usesCount, MAX_SPEED, MIN_SPEED, SPEED_STOPS, WIDTH_STOPS, type Params } from './state';
+import { COUNT_STOPS, LENGTH_STOPS, MAX_COUNT, usesCount, MAX_SPEED, MIN_SPEED, SPEED_STOPS, WIDTH_STOPS, type Params } from './state';
 
 export interface PanelActions {
   get(): Params;
@@ -75,24 +75,6 @@ export function createPanel(host: El, a: PanelActions) {
     return s;
   };
 
-  const num = (value: number, min: number, max: number, step: number, on: (v: number) => void, slider = true) => {
-    const wrap = h('div', { class: slider ? 'num' : 'num solo' });
-    const n = h('input', { type: 'number', min: String(min), max: String(max), step: String(step), value: String(value) }) as HTMLInputElement;
-    const r = h('input', { type: 'range', min: String(min), max: String(max), step: String(step), value: String(value) }) as HTMLInputElement;
-    const push = (v: string, src: HTMLInputElement, other: HTMLInputElement) => {
-      const x = Number(v);
-      if (!Number.isFinite(x) || v === '') return;
-      other.value = String(x);
-      on(Math.min(max, Math.max(min, x)));
-      void src;
-    };
-    n.addEventListener('input', () => push(n.value, n, r));
-    r.addEventListener('input', () => push(r.value, r, n));
-    wrap.append(n);
-    if (slider) wrap.append(r);
-    return wrap;
-  };
-
   /**
    * Champ numérique libre + curseur à crans.
    *  - `stops` : un cran par valeur de la liste (échelle logarithmique si les valeurs suivent une
@@ -101,7 +83,7 @@ export function createPanel(host: El, a: PanelActions) {
    * Les repères sont dessinés sous la piste ; le champ accepte toute valeur de min à max.
    */
   type Notches = { min: number; max: number; step: number; stops?: number[]; every?: number };
-  const notched = (value: number, o: Notches, on: (v: number) => void) => {
+  const notchedParts = (value: number, o: Notches, on: (v: number) => void) => {
     const { min, max, step, stops, every } = o;
     const nearest = (v: number) =>
       stops!.reduce((best, s, i) => (Math.abs(Math.log(s / v)) < Math.abs(Math.log(stops![best] / v)) ? i : best), 0);
@@ -111,7 +93,6 @@ export function createPanel(host: El, a: PanelActions) {
     const clamp = (x: number) => Math.min(max, Math.max(min, x));
     const round = (x: number) => Math.round(x * 1000) / 1000;
 
-    const wrap = h('div', { class: 'num' });
     const n = h('input', { type: 'number', min: String(min), max: String(max), step: String(step), value: String(round(value)) }) as HTMLInputElement;
     const r = h('input', {
       type: 'range',
@@ -138,8 +119,12 @@ export function createPanel(host: El, a: PanelActions) {
     n.addEventListener('change', () => {
       n.value = String(round(clamp(Number(n.value) || min)));
     });
-    wrap.append(n, h('div', { class: 'stops' }, r, ticks));
-    return wrap;
+    return { input: n, track: h('div', { class: 'stops' }, r, ticks) };
+  };
+  /** Champ + curseur côte à côte sur une ligne. */
+  const notched = (value: number, o: Notches, on: (v: number) => void) => {
+    const { input, track } = notchedParts(value, o, on);
+    return h('div', { class: 'num' }, input, track);
   };
 
   /** Interrupteur à deux positions (la position active est en bleu). */
@@ -235,7 +220,11 @@ export function createPanel(host: El, a: PanelActions) {
     body.append(section(t.section.trace,
       ...(!usesCount(p.source)
         ? [] // chiffres libres, texte et image : utilisés en entier (aucune troncature)
-        : [field(t.count, num(p.count, 1, MAX_COUNT, 1, (v) => a.set({ count: Math.round(v) }), false))]),
+        : (() => {
+            const c = notchedParts(p.count, { min: 1, max: MAX_COUNT, step: 1, stops: COUNT_STOPS }, (v) => a.set({ count: Math.round(v) }));
+            c.track.classList.add('full');
+            return [field(t.count, c.input), c.track];
+          })()),
       field(t.segLen, notched(p.segLen, { min: 1, max: 100, step: 0.5, stops: LENGTH_STOPS }, (v) => a.set({ segLen: v }))),
       field(t.coef, notched(p.coef, { min: 0, max: 360, step: 0.1, every: 36 }, (v) => a.set({ coef: v }))),
       field(t.firstDir, toggle<'1' | '-1'>([['-1', t.ccw], ['1', t.cw]], String(p.firstDir) as '1' | '-1',

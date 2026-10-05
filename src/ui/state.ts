@@ -47,6 +47,9 @@ export const MAX_SPEED = 5000;
 export const SPEED_STOPS = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000];
 
 /** Crans de la longueur de segment (1-100) et de l'épaisseur du trait (0,1-10), en suite 1-2-5. */
+/** Crans du nombre de décimales (1 à 100 000), en suite 1-2-5. */
+export const COUNT_STOPS = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000];
+
 export const LENGTH_STOPS = [1, 2, 5, 10, 20, 50, 100];
 export const WIDTH_STOPS = [0.1, 0.2, 0.5, 1, 2, 5, 10];
 

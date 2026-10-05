@@ -98,29 +98,50 @@ async function reloadDigits() {
   abort?.abort();
   abort = new AbortController();
   const t = strings(params.lang);
-  panel.setStatus(params.source === 'pi' ? t.loading : '');
+  setStatus(params.source === 'pi' ? t.loading : '');
   try {
     const d = await getDigits(params, {
       image,
       signal: abort.signal,
       onProgress: (done, total) => {
-        if (gen === generation && params.source === 'pi' && done < total) panel.setStatus(`${t.loading} ${done}/${total}`);
+        if (gen === generation && params.source === 'pi' && done < total) setStatus(`${t.loading} ${done}/${total}`);
       },
     });
     if (gen !== generation) return;
     digits = d;
     shown = playing ? 0 : d.length;
     rebuildPath();
-    panel.setStatus(contentStatus());
+    setStatus(contentStatus());
   } catch (e) {
     if (gen !== generation || (e as Error).name === 'AbortError') return;
-    panel.setStatus(t.error + (e as Error).message);
+    setStatus(t.error + (e as Error).message);
   }
+}
+
+// --- barre du bas : messages d'état ------------------------------------
+let statusToken = 0;
+function setStatus(msg: string) {
+  statusToken++;
+  panel.setStatus(msg);
+}
+/** Confirmation éphémère (téléchargement, copie…) : revient à l'état courant au bout de 4 s. */
+function flash(msg: string) {
+  setStatus(msg);
+  const token = statusToken;
+  window.setTimeout(() => { if (token === statusToken) panel.setStatus(contentStatus()); }, 4000);
+}
+const downloaded = (format: string) => flash(strings(params.lang).downloaded.replace('{f}', format));
+const failed = (e: unknown) => setStatus(strings(params.lang).error + (e as Error).message);
+
+/** Le lien complet (#p=…) ne décrit plus l'état dès qu'un paramètre change : retour à l'adresse courte. */
+function resetShareUrl() {
+  if (location.hash) history.replaceState(null, '', location.pathname + location.search);
 }
 
 function update(patch: Partial<Params>) {
   const before = params;
   params = sanitize({ ...params, ...patch });
+  if (JSON.stringify(before) !== JSON.stringify(params)) resetShareUrl();
   if (digitKey(before) !== digitKey(params)) {
     window.clearTimeout(debounce);
     debounce = window.setTimeout(reloadDigits, 250);
@@ -169,6 +190,7 @@ async function loadImage(file: File) {
   const ctx = c.getContext('2d', { willReadFrequently: true })!;
   ctx.drawImage(bmp, 0, 0, w, h);
   image = { rgba: ctx.getImageData(0, 0, w, h).data, w, h };
+  resetShareUrl();
   bmp.close();
   window.clearTimeout(debounce);
   await reloadDigits();
@@ -187,27 +209,29 @@ const panel = createPanel(app, {
   fit: fitView,
   zoom: (k) => viewport.zoomAt(stage.width / 2, stage.height / 2, k),
   loadImage: (f) => void loadImage(f),
-  exportPng: (s) => void exportPng(exportInput(), s),
-  exportSvg: () => exportSvg(exportInput()),
-  exportPdf: () => void exportPdf(exportInput()),
+  exportPng: (s) => void exportPng(exportInput(), s).then(() => downloaded('PNG'), failed),
+  exportSvg: () => { try { exportSvg(exportInput()); downloaded('SVG'); } catch (e) { failed(e); } },
+  exportPdf: () => void exportPdf(exportInput()).then(() => downloaded('PDF'), failed),
   copyLink: async () => {
     history.replaceState(null, '', shareUrl());
     try {
       await navigator.clipboard.writeText(shareUrl());
-      panel.setStatus(strings(params.lang).copied);
+      flash(strings(params.lang).copied);
     } catch {
-      panel.setStatus(shareUrl());
+      setStatus(strings(params.lang).copyFailed);
     }
   },
-  saveJson: () => exportParams(JSON.stringify(params, null, 2), `${exportInput().fileBase}.json`),
+  saveJson: () => { exportParams(JSON.stringify(params, null, 2), `${exportInput().fileBase}.json`); downloaded('JSON'); },
   loadJson: async (f) => {
     try {
       const obj = JSON.parse(await f.text());
       params = sanitize(obj);
+      resetShareUrl();
       panel.rebuild();
       await reloadDigits();
+      flash(strings(params.lang).jsonLoaded);
     } catch (e) {
-      panel.setStatus(strings(params.lang).error + (e as Error).message);
+      setStatus(strings(params.lang).error + (e as Error).message);
     }
   },
   hasImage: () => image !== null,
