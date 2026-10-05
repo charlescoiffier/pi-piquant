@@ -81,13 +81,15 @@ champ numérique accepte aussi une valeur précise saisie au clavier.
 
 - **PNG** (2048, 4096 ou 8192 pixels), **SVG** (dessin vectoriel, agrandissable sans perte) et **PDF** (A4).
   Les fichiers portent un nom explicite, par exemple `pi-piquant_10deg_100dec.png`.
-- **Copier lien** : le lien reproduit exactement le même dessin chez la personne qui l'ouvre. Il est **lisible**
-  et décrit tous les réglages, par exemple
-  `…/#source=pi&decimales=100&angle=10&segment=10&sens=anti-horaire&epaisseur=0.5&trait=111111&fond=ffffff&titre=oui&vitesse=500&langue=fr` ;
-  on peut le modifier à la main. Il ne contient pas l'image si la source en est une. La barre d'adresse affiche ce lien
-  et revient à l'adresse courte dès qu'un réglage change.
+- **Copier lien** : le lien reproduit le même dessin chez la personne qui l'ouvre. Il est **lisible** et contient les
+  réglages du dessin (source, décimales, longueur du segment, angle unitaire, sens du premier angle, couleurs du trait
+  et du fond, épaisseur), par exemple
+  `…/#source=pi&decimales=100&segment=10&angle=10&sens=anti-horaire&trait=111111&fond=ffffff&epaisseur=0.5`.
+  Il ne contient ni l'animation, ni la langue, ni l'affichage du titre (préférences personnelles), ni l'image si la
+  source en est une. On peut le modifier à la main. La barre d'adresse affiche ce lien et revient à l'adresse courte
+  dès qu'un réglage change.
 - **Ouvrir un lien** : coller un lien dans la barre d'adresse (même sur la page déjà ouverte), ou faire Cmd/Ctrl + V
-  dans la page (hors d'un champ de saisie), applique tous ses réglages.
+  dans la page (hors d'un champ de saisie), applique ses réglages sans changer ta langue, ta vitesse d'animation ni l'affichage du titre.
 - **JSON** : enregistrer les réglages dans un fichier (↓ JSON) puis les rouvrir plus tard (↑ JSON).
 
 ### Limites
@@ -172,40 +174,40 @@ Le texte et l'image sont convertis **sans perte** en chiffres 0-9, puis tracés 
 
 ## Lien de partage
 
-Les réglages sont écrits dans le fragment de l'adresse (`#…`, jamais envoyé à un serveur), en paires `nom=valeur`
-séparées par `&`, avec des noms en français :
+Les réglages du dessin sont écrits dans le fragment de l'adresse (`#…`, jamais envoyé à un serveur), en paires
+`nom=valeur` séparées par `&`, avec des noms en français :
 
 ```
-#source=pi&decimales=100&angle=10&segment=10&sens=anti-horaire&epaisseur=0.5&trait=111111&fond=ffffff&titre=oui&vitesse=500&langue=fr
-#source=texte&angle=24&texte=François%20Morellet&segment=10&sens=horaire&epaisseur=0.5&trait=cc3333&fond=111111&titre=oui&vitesse=500&langue=fr
+#source=pi&decimales=100&segment=10&angle=10&sens=anti-horaire&trait=111111&fond=ffffff&epaisseur=0.5
+#source=texte&segment=10&angle=24&sens=horaire&trait=cc3333&fond=111111&epaisseur=0.5&texte=François%20Morellet
 ```
 
 | Paramètre | Valeurs | Écrit pour… |
 |---|---|---|
 | `source` | `pi`, `e`, `phi`, `racine2`, `chiffres`, `texte`, `image` | toutes les sources |
 | `decimales` | 1 à 100 000 | π, e, φ, √2 |
-| `angle` | degrés (`.` ou `,` acceptés) | toutes les sources |
-| `chiffres` | suite de chiffres | source `chiffres` |
-| `texte` | texte | source `texte` |
-| `parcours` | `lignes`, `serpentin`, `spirale`, `hilbert` | source `image` |
-| `segment`, `epaisseur`, `vitesse` | nombres | toutes les sources |
-| `sens` | `horaire`, `anti-horaire` | toutes les sources |
+| `segment` | longueur du segment | toutes les sources |
+| `angle` | angle unitaire en degrés (`.` ou `,` acceptés) | toutes les sources |
+| `sens` | `horaire`, `anti-horaire` (sens du premier angle) | toutes les sources |
 | `trait`, `fond` | couleur hexadécimale sans `#` (3 ou 6 chiffres en lecture) | toutes les sources |
-| `titre` | `oui`, `non` | toutes les sources |
-| `langue` | `fr`, `en` | toutes les sources |
+| `epaisseur` | épaisseur du trait | toutes les sources |
+| `chiffres`, `texte` | suite de chiffres, texte (en fin de lien) | source `chiffres`, source `texte` |
+| `parcours` | `lignes`, `serpentin`, `spirale`, `hilbert` (en fin de lien) | source `image` |
 
-Le lien décrit **tout l'état utile** pour la source choisie, valeurs par défaut comprises : il reste exact même si les
-valeurs par défaut changent un jour. Seuls les réglages sans effet pour la source sont omis (pas de `texte` pour π, pas de
-`decimales` pour un texte). À la lecture, les clés inconnues sont ignorées et les valeurs invalides ramenées aux valeurs
-par défaut ou aux bornes (`sanitize`). Un fragment sans aucun réglage reconnu (y compris l'ancien format `#p=…`) ouvre
-l'application avec ses valeurs aléatoires. Les valeurs sont encodées comme dans une adresse (`%20` pour l'espace,
-`%26` pour `&`…), mais les caractères accentués, guillemets, emojis et la ponctuation courante (`, ; : / ? @`) restent
-lisibles. L'image n'est jamais incluse.
+Le lien décrit le dessin **en entier**, valeurs par défaut comprises : il reste exact même si les valeurs par défaut
+changent un jour. Seuls les réglages sans effet pour la source sont omis (pas de `texte` pour π, pas de `decimales` pour
+un texte). **Ne sont pas dans le lien** : la vitesse d'animation, la langue et l'affichage du titre (préférences
+personnelles), ni l'image. À la lecture, les clés inconnues (dont celles des liens des versions précédentes : `vitesse`,
+`langue`, `titre`) sont ignorées, et les valeurs invalides ramenées aux valeurs par défaut ou aux bornes (`sanitize`). Un
+fragment sans aucun réglage reconnu (y compris l'ancien format `#p=…`) ouvre l'application avec ses valeurs aléatoires.
+Les valeurs sont encodées comme dans une adresse (`%20` pour l'espace, `%26` pour `&`…), mais les caractères accentués,
+guillemets, emojis et la ponctuation courante (`, ; : / ? @`) restent lisibles.
 
 Un lien est appliqué dans deux cas, gérés dans `src/main.ts` : changement du fragment sur la page déjà ouverte
 (événement `hashchange`, par exemple un lien collé dans la barre d'adresse) et collage dans la page (événement `paste`,
-ignoré dans les champs de saisie). Le code d'encodage et de décodage est dans `encodeParams` / `decodeParams`
-(`src/ui/state.ts`).
+ignoré dans les champs de saisie). `withPersonalSettings` conserve alors la vitesse, la langue et le titre de
+l'utilisateur ; à l'ouverture, la langue suit celle du navigateur. Le code d'encodage et de décodage est dans
+`encodeParams` / `decodeParams` (`src/ui/state.ts`).
 
 ## Publication
 

@@ -10,7 +10,7 @@ import { createPanel } from './ui/panel';
 import { strings } from './ui/i18n';
 import { createInfo } from './ui/info';
 import { makeFileBase, makeSubtitle, makeTitle } from './ui/title';
-import { DEFAULTS, decodeParams, encodeParams, sanitize, usesCount, type Params } from './ui/state';
+import { DEFAULTS, decodeParams, encodeParams, sanitize, usesCount, withPersonalSettings, type Params } from './ui/state';
 
 const fromHash = () => {
   const fragment = location.hash.slice(1);
@@ -19,14 +19,13 @@ const fromHash = () => {
 
 const randInt = (min: number, max: number) => min + Math.floor(Math.random() * (max - min + 1));
 
+// Préférences personnelles (hors lien) : la langue suit le navigateur
+const start: Params = { ...DEFAULTS, lang: navigator.language.startsWith('fr') ? 'fr' : 'en' };
 // Sans lien de partage : décimales au hasard (10-200) et angle unitaire entier au hasard (1-90°)
 const linked = fromHash();
-let params: Params = linked ?? {
-  ...DEFAULTS,
-  count: randInt(10, 200),
-  coef: randInt(1, 90),
-  lang: navigator.language.startsWith('fr') ? 'fr' : 'en',
-};
+let params: Params = linked
+  ? withPersonalSettings(linked, start)
+  : { ...start, count: randInt(10, 200), coef: randInt(1, 90) };
 if (!linked) resetShareUrl(); // fragment illisible (ancien lien…) : on ne le laisse pas dans la barre d'adresse
 let digits: Uint8Array = new Uint8Array(0);
 let path: PathResult = buildPath(digits, params);
@@ -242,9 +241,9 @@ const panel = createPanel(app, {
 
 const info = createInfo(app, () => params.lang);
 
-/** Remplace tous les réglages par ceux d'un lien (collé dans l'adresse ou dans la page). */
+/** Applique les réglages d'un lien (collé dans l'adresse ou dans la page) ; vitesse, langue et titre sont conservés. */
 async function applyLink(p: Params) {
-  params = p;
+  params = withPersonalSettings(p, params);
   panel.rebuild();
   await reloadDigits();
 }

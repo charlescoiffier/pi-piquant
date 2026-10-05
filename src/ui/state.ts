@@ -55,7 +55,7 @@ export const WIDTH_STOPS = [0.1, 0.2, 0.5, 1, 2, 5, 10];
 
 // --- lien de partage ------------------------------------------------------
 // Format lisible, noms en français : #source=pi&decimales=100&angle=10&sens=horaire
-// Tous les réglages utiles pour la source choisie sont écrits, valeurs par défaut comprises.
+// Les réglages du dessin sont tous écrits, valeurs par défaut comprises ; ni animation, ni langue, ni titre.
 
 const SOURCE_NAMES: Record<Source, string> = {
   pi: 'pi', e: 'e', phi: 'phi', sqrt2: 'racine2', free: 'chiffres', text: 'texte', image: 'image',
@@ -72,29 +72,35 @@ const num = (v: number) => String(Math.round(v * 1000) / 1000);
 const hex = (c: string) => c.replace('#', '').toLowerCase();
 
 /**
- * Paramètres → fragment d'adresse (sans le « # »). Le lien décrit **tout l'état** utile pour la source
- * choisie, valeurs par défaut comprises : il reste donc exact même si les valeurs par défaut changent un jour.
- * Seuls les réglages sans effet pour la source sont omis (`decimales` pour le texte, `texte` pour π…).
- * L'image n'est jamais incluse (trop lourde).
+ * Paramètres → fragment d'adresse (sans le « # »). Le lien décrit le dessin : source, décimales (nombres),
+ * longueur du segment, angle unitaire, sens du premier angle, couleurs du trait et du fond, épaisseur, plus
+ * ce qui est propre à la source (chiffres, texte, parcours de l'image) en fin de lien. Valeurs par défaut
+ * comprises : le lien reste exact même si les valeurs par défaut changent un jour.
+ * Hors lien : l'animation (vitesse) et les préférences d'affichage personnelles (langue, titre), de même que l'image.
  */
 export function encodeParams(p: Params): string {
   const parts: [string, string][] = [['source', SOURCE_NAMES[p.source]]];
   if (usesCount(p.source)) parts.push(['decimales', String(p.count)]);
-  parts.push(['angle', num(p.coef)]);
+  parts.push(
+    ['segment', num(p.segLen)],
+    ['angle', num(p.coef)],
+    ['sens', p.firstDir === 1 ? 'horaire' : 'anti-horaire'],
+    ['trait', hex(p.stroke)],
+    ['fond', hex(p.bg)],
+    ['epaisseur', num(p.strokeWidth)],
+  );
   if (p.source === 'free') parts.push(['chiffres', p.freeDigits]);
   if (p.source === 'text') parts.push(['texte', p.text]);
   if (p.source === 'image') parts.push(['parcours', TRAVERSAL_NAMES[p.traversal]]);
-  parts.push(
-    ['segment', num(p.segLen)],
-    ['sens', p.firstDir === 1 ? 'horaire' : 'anti-horaire'],
-    ['epaisseur', num(p.strokeWidth)],
-    ['trait', hex(p.stroke)],
-    ['fond', hex(p.bg)],
-    ['titre', p.showTitle ? 'oui' : 'non'],
-    ['vitesse', num(p.speed)],
-    ['langue', p.lang],
-  );
   return parts.map(([k, v]) => `${k}=${readableEscape(v)}`).join('&');
+}
+
+/**
+ * Applique un lien sans toucher aux réglages qui n'en font pas partie : vitesse d'animation, langue et titre
+ * restent ceux de l'utilisateur (un lien collé ne doit pas, par exemple, repasser l'interface en français).
+ */
+export function withPersonalSettings(link: Params, current: Params): Params {
+  return { ...link, speed: current.speed, lang: current.lang, showTitle: current.showTitle };
 }
 
 /**
@@ -138,9 +144,6 @@ export function decodeParams(s: string): Params | null {
       case 'epaisseur': raw.strokeWidth = number(); break;
       case 'trait': raw.stroke = hexColor(val); break;
       case 'fond': raw.bg = hexColor(val); break;
-      case 'titre': raw.showTitle = val === 'non' ? false : val === 'oui' ? true : undefined; break;
-      case 'vitesse': raw.speed = number(); break;
-      case 'langue': raw.lang = val; break;
       default: continue; // clé inconnue
     }
     known = true;

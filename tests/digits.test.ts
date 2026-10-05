@@ -7,7 +7,7 @@ import { decodeImage, fitImageSize, IMAGE_HEADER_DIGITS, IMAGE_MAX_PIXELS, image
 import { freeDigits } from '../src/digits/free';
 import { embeddedDigits } from '../src/digits/embedded';
 import { makeFileBase, makeSubtitle, makeTitle } from '../src/ui/title';
-import { decodeParams, DEFAULTS, encodeParams, sanitize, usesCount } from '../src/ui/state';
+import { decodeParams, DEFAULTS, encodeParams, sanitize, usesCount, withPersonalSettings } from '../src/ui/state';
 
 const str = (d: Uint8Array) => Array.from(d).join('');
 const hist = (d: Uint8Array) => {
@@ -115,7 +115,7 @@ describe('texte réversible', () => {
     'François Morellet',
     'é ç œ ß à ï ü',
     '日本語 · 中文 · 한국어',
-    'Emojis 😀🎨π✨ et 👨‍👩‍👧',
+    'Emojis 😀🎨π✨ et 👨\u200d👩\u200d👧',
     'a\nb\tc\r\n',
     'dezd dksdmwjc kdslncjwkl dn,wcl jkwchjdkm jksmw jckdmsnjdksmw cd,slc kdsmcdksm< nkmdsnck<lmdsncklmdsn<c mndsm',
     '',
@@ -213,21 +213,27 @@ describe('divers', () => {
 });
 
 describe('lien de partage lisible', () => {
-  const TOUT = 'segment=10&sens=anti-horaire&epaisseur=0.5&trait=111111&fond=ffffff&titre=oui&vitesse=500&langue=fr';
-  it('sans rien modifier, le lien décrit tous les réglages (valeurs par défaut comprises)', () => {
-    expect(encodeParams({ ...DEFAULTS })).toBe('source=pi&decimales=100&angle=10&' + TOUT);
+  /** Réglages du dessin communs à toutes les sources, avec les valeurs par défaut. */
+  const DESSIN = (angle: number) => `segment=10&angle=${angle}&sens=anti-horaire&trait=111111&fond=ffffff&epaisseur=0.5`;
+  it('sans rien modifier, le lien décrit tous les réglages du dessin (valeurs par défaut comprises)', () => {
+    expect(encodeParams({ ...DEFAULTS })).toBe('source=pi&decimales=100&' + DESSIN(10));
   });
-  it('lien d\'un nombre : tous les réglages utiles, mais pas ceux sans effet (texte, chiffres, parcours)', () => {
+  it('ni animation, ni langue, ni titre dans le lien', () => {
+    const l = encodeParams({ ...DEFAULTS, speed: 2000, lang: 'en', showTitle: false });
+    expect(l).not.toMatch(/vitesse|langue|titre/);
+    expect(l).toBe('source=pi&decimales=100&' + DESSIN(10));
+  });
+  it('lien d\'un nombre : décimales, mais pas les réglages sans effet (texte, chiffres, parcours)', () => {
     const l = encodeParams({ ...DEFAULTS, text: 'autre texte', freeDigits: '42', traversal: 'spiral', count: 350, coef: 51 });
-    expect(l).toBe('source=pi&decimales=350&angle=51&' + TOUT);
+    expect(l).toBe('source=pi&decimales=350&' + DESSIN(51));
     expect(l).not.toMatch(/texte=|chiffres=|parcours=/);
   });
-  it('sources sans décimales : pas de « decimales », mais le réglage propre à la source', () => {
-    expect(encodeParams({ ...DEFAULTS, source: 'free', freeDigits: '3141' })).toBe('source=chiffres&angle=10&chiffres=3141&' + TOUT);
-    expect(encodeParams({ ...DEFAULTS, source: 'image', traversal: 'spiral' })).toBe('source=image&angle=10&parcours=spirale&' + TOUT);
+  it('sources sans décimales : le réglage propre à la source est écrit en fin de lien', () => {
+    expect(encodeParams({ ...DEFAULTS, source: 'free', freeDigits: '3141' })).toBe('source=chiffres&' + DESSIN(10) + '&chiffres=3141');
+    expect(encodeParams({ ...DEFAULTS, source: 'image', traversal: 'spiral' })).toBe('source=image&' + DESSIN(10) + '&parcours=spirale');
   });
   it('allers-retours : chaque source avec des réglages non par défaut', () => {
-    const base = { ...DEFAULTS, segLen: 20, firstDir: 1 as const, strokeWidth: 2, stroke: '#cc3333', bg: '#111111', showTitle: false, speed: 1000, lang: 'en' as const, coef: 7.5 };
+    const base = { ...DEFAULTS, segLen: 20, firstDir: 1 as const, strokeWidth: 2, stroke: '#cc3333', bg: '#111111', coef: 7.5 };
     const cas = [
       { ...base, source: 'pi' as const, count: 2000 },
       { ...base, source: 'e' as const, count: 5 },
@@ -241,16 +247,16 @@ describe('lien de partage lisible', () => {
       const lien = encodeParams(p);
       expect(lien).not.toMatch(/[\s"<>]/); // jamais d'espace ni de caractère qui casserait un lien collé dans un message
       expect(lien).not.toContain('p=ey'); // plus de base64
-      expect(decodeParams(lien)).toEqual(sanitize(p));
+      expect(decodeParams(lien)).toEqual(sanitize(p)); // animation, langue et titre : valeurs par défaut, identiques ici
     }
   });
   it('les noms sont en français et les valeurs lisibles', () => {
-    const l = encodeParams({ ...DEFAULTS, source: 'sqrt2', count: 64, coef: 51, firstDir: 1, stroke: '#CC3333', showTitle: false });
-    expect(l).toBe('source=racine2&decimales=64&angle=51&segment=10&sens=horaire&epaisseur=0.5&trait=cc3333&fond=ffffff&titre=non&vitesse=500&langue=fr');
+    const l = encodeParams({ ...DEFAULTS, source: 'sqrt2', count: 64, coef: 51, firstDir: 1, stroke: '#CC3333' });
+    expect(l).toBe('source=racine2&decimales=64&segment=10&angle=51&sens=horaire&trait=cc3333&fond=ffffff&epaisseur=0.5');
   });
-  it('texte lisible dans le lien : accents et guillemets conservés, séparateurs encodés', () => {
+  it('texte lisible dans le lien : accents et guillemets conservés, séparateurs encodés, texte en fin de lien', () => {
     const l = encodeParams({ ...DEFAULTS, source: 'text', text: 'François & Co « Morellet »' });
-    expect(l).toContain('source=texte&angle=10&texte=François%20%26%20Co%20«%20Morellet%20»&segment=10');
+    expect(l).toBe('source=texte&' + DESSIN(10) + '&texte=François%20%26%20Co%20«%20Morellet%20»');
     expect(decodeParams(l)!.text).toBe('François & Co « Morellet »');
   });
   it('espace insécable et caractères invisibles restent encodés (aller-retour exact)', () => {
@@ -259,36 +265,47 @@ describe('lien de partage lisible', () => {
     expect(l).not.toMatch(/[\u00a0\u200d\u2028]/);
     expect(decodeParams(l)!.text).toBe(t);
   });
+  it('ponctuation courante lisible, séparateurs toujours encodés', () => {
+    const t = 'a,b;c:d/e?f@g h&i=j#k%l';
+    const l = encodeParams({ ...DEFAULTS, source: 'text', text: t });
+    expect(l).toContain('texte=a,b;c:d/e?f@g%20h%26i%3Dj%23k%25l');
+    expect(decodeParams(l)!.text).toBe(t);
+  });
   it('le texte d\'exemple est dans le lien et se relit à l\'identique', () => {
     const p = { ...DEFAULTS, source: 'text' as const };
     expect(encodeParams(p)).toContain('texte=Morellet,%20fils%20monstrueux');
     expect(decodeParams(encodeParams(p))).toEqual(sanitize(p));
   });
-  it('ponctuation courante lisible, séparateurs toujours encodés', () => {
-    const t = 'a,b;c:d/e?f@g h&i=j#k%l';
-    const l = encodeParams({ ...DEFAULTS, source: 'text', text: t });
-    expect(l).toContain('texte=a,b;c:d/e?f@g%20h%26i%3Dj%23k%25l&');
-    expect(decodeParams(l)!.text).toBe(t);
-  });
   it('un lien sans le réglage d\'une source retombe sur la valeur par défaut', () => {
     expect(decodeParams('source=texte&angle=10')!.text).toBe(DEFAULTS.text);
   });
+  it('un lien appliqué conserve la vitesse, la langue et le titre de l\'utilisateur', () => {
+    const lien = decodeParams(encodeParams({ ...DEFAULTS, source: 'e', count: 30, coef: 40 }))!;
+    const moi = { ...DEFAULTS, speed: 2000, lang: 'en' as const, showTitle: false };
+    const r = withPersonalSettings(lien, moi);
+    expect([r.source, r.count, r.coef]).toEqual(['e', 30, 40]);
+    expect([r.speed, r.lang, r.showTitle]).toEqual([2000, 'en', false]);
+  });
+  it('anciens liens (avec titre, vitesse, langue) : ces clés sont ignorées, le reste est lu', () => {
+    const p = decodeParams('source=pi&decimales=50&angle=30&titre=non&vitesse=1000&langue=en')!;
+    expect([p.count, p.coef]).toEqual([50, 30]);
+    expect([p.showTitle, p.speed, p.lang]).toEqual([DEFAULTS.showTitle, DEFAULTS.speed, DEFAULTS.lang]);
+  });
   it('lecture tolérante : virgule décimale, couleur courte, # facultatif, % isolé, clés inconnues', () => {
-    const p = decodeParams('source=pi&angle=7,5&trait=%23c33&fond=FFF&titre=non&inconnu=1&texte=100%')!;
+    const p = decodeParams('source=pi&angle=7,5&trait=%23c33&fond=FFF&inconnu=1&texte=100%')!;
     expect(p.coef).toBe(7.5);
     expect(p.stroke).toBe('#cc3333');
     expect(p.bg).toBe('#ffffff');
-    expect(p.showTitle).toBe(false);
     expect(decodeParams('source=texte&texte=100%')!.text).toBe('100%');
   });
   it('valeurs invalides : ramenées aux bornes ou au défaut', () => {
-    const p = decodeParams('source=nimportequoi&decimales=999999999&angle=abc&sens=?&trait=zzz&vitesse=0&epaisseur=-4')!;
+    const p = decodeParams('source=nimportequoi&decimales=999999999&angle=abc&sens=?&trait=zzz&segment=0&epaisseur=-4')!;
     expect(p.source).toBe('pi');
     expect(p.count).toBe(100_000);
     expect(p.coef).toBe(DEFAULTS.coef);
     expect(p.firstDir).toBe(DEFAULTS.firstDir);
     expect(p.stroke).toBe(DEFAULTS.stroke);
-    expect(p.speed).toBe(1);
+    expect(p.segLen).toBe(0.1);
     expect(p.strokeWidth).toBe(0.1);
   });
   it('aucun réglage reconnu (fragment vide, ancien lien #p=…, bruit) → null : ouverture aléatoire', () => {
