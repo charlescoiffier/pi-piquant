@@ -98,7 +98,7 @@ async function reloadDigits() {
     digits = d;
     shown = playing ? 0 : d.length;
     rebuildPath();
-    panel.setStatus(`${d.length.toLocaleString(params.lang)} ${t.digitsShown}`);
+    panel.setStatus('');
   } catch (e) {
     if (gen !== generation || (e as Error).name === 'AbortError') return;
     panel.setStatus(t.error + (e as Error).message);
