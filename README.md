@@ -1,5 +1,7 @@
 # π-piquant
 
+[![pipeline](https://gitlab.com/charlescoiffier/pi-piquant/badges/main/pipeline.svg)](https://gitlab.com/charlescoiffier/pi-piquant/-/pipelines)
+
 Réinterprétation web des œuvres « pi-piquant » de François Morellet : une suite de chiffres
 (décimales de π par défaut) devient un tracé de segments égaux, dont les angles sont dictés par les chiffres.
 
