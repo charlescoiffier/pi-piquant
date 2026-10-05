@@ -98,3 +98,9 @@ button.info {
 .info-dialog p { margin: 0 0 9px; }
 .info-dialog a { color: var(--accent); }
 .info-dialog .right { margin: 10px 0 0; }
+
+/* Curseur à crans : repères sous la piste */
+.stops { flex: 1; min-width: 0; }
+.stops input[type=range] { width: 100%; display: block; }
+.ticks { display: flex; justify-content: space-between; padding: 0 7px; margin-top: -1px; pointer-events: none; }
+.ticks span { width: 1px; height: 4px; background: #b3b3bd; }

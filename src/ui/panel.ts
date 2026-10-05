@@ -1,5 +1,5 @@
 import { strings, type Dict } from './i18n';
-import { MAX_COUNT, type Params } from './state';
+import { MAX_COUNT, MAX_SPEED, MIN_SPEED, SPEED_STOPS, type Params } from './state';
 
 export interface PanelActions {
   get(): Params;
@@ -90,6 +90,41 @@ export function createPanel(host: El, a: PanelActions) {
     r.addEventListener('input', () => push(r.value, r, n));
     wrap.append(n);
     if (slider) wrap.append(r);
+    return wrap;
+  };
+
+  /**
+   * Champ numérique libre + curseur à crans (un cran par valeur de `stops`, échelle logarithmique
+   * puisque les crans sont en 1-2-5). Le curseur se cale sur le cran le plus proche de la valeur saisie.
+   */
+  const detents = (value: number, stops: number[], min: number, max: number, on: (v: number) => void) => {
+    const nearest = (v: number) =>
+      stops.reduce((best, s, i) => (Math.abs(Math.log(s / v)) < Math.abs(Math.log(stops[best] / v)) ? i : best), 0);
+    const wrap = h('div', { class: 'num' });
+    const n = h('input', { type: 'number', min: String(min), max: String(max), step: '1', value: String(Math.round(value)) }) as HTMLInputElement;
+    const r = h('input', { type: 'range', min: '0', max: String(stops.length - 1), step: '1', value: String(nearest(value)) }) as HTMLInputElement;
+    r.setAttribute('aria-valuetext', String(Math.round(value)));
+    const ticks = h('div', { class: 'ticks', 'aria-hidden': 'true' });
+    for (const s of stops) ticks.append(h('span', { title: String(s) }));
+    r.addEventListener('input', () => {
+      const v = stops[Number(r.value)];
+      n.value = String(v);
+      r.setAttribute('aria-valuetext', String(v));
+      on(v);
+    });
+    n.addEventListener('input', () => {
+      const x = Number(n.value);
+      if (n.value === '' || !Number.isFinite(x)) return;
+      const v = Math.min(max, Math.max(min, x));
+      r.value = String(nearest(v));
+      on(v);
+    });
+    // à la sortie du champ, afficher la valeur réellement appliquée (bornée à min..max, entière)
+    n.addEventListener('change', () => {
+      const x = Math.round(Math.min(max, Math.max(min, Number(n.value) || min)));
+      n.value = String(x);
+    });
+    wrap.append(n, h('div', { class: 'stops' }, r, ticks));
     return wrap;
   };
 
@@ -222,7 +257,7 @@ export function createPanel(host: El, a: PanelActions) {
           return b;
         })(),
       ),
-      field(t.speed, num(p.speed, 10, 5000, 10, (v) => a.set({ speed: v }))),
+      field(t.speed, detents(p.speed, SPEED_STOPS, MIN_SPEED, MAX_SPEED, (v) => a.set({ speed: v }))),
     ));
 
     // Vue

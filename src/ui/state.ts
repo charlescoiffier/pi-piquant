@@ -32,11 +32,16 @@ export const DEFAULTS: Params = {
   text: 'Morellet',
   traversal: 'rows',
   showTitle: true,
-  speed: 400,
+  speed: 500,
   lang: 'fr',
 };
 
 export const MAX_COUNT = 100_000;
+
+/** Vitesse d'animation (segments par seconde) et crans du curseur : suite 1-2-5, de 1 à 5000. */
+export const MIN_SPEED = 1;
+export const MAX_SPEED = 5000;
+export const SPEED_STOPS = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000];
 
 /** Paramètres sérialisables (tout sauf l'image, trop lourde pour une URL). */
 export function encodeParams(p: Params): string {
@@ -78,7 +83,7 @@ export function sanitize(o: Partial<Params> | Record<string, unknown>): Params {
     text: typeof x.text === 'string' ? x.text.slice(0, 100_000) : d.text,
     traversal: oneOf(x.traversal, ['rows', 'serpentine', 'spiral', 'hilbert'], d.traversal),
     showTitle: x.showTitle !== false,
-    speed: clamp(x.speed, 1, 100_000, d.speed),
+    speed: clamp(x.speed, MIN_SPEED, MAX_SPEED, d.speed),
     lang: oneOf(x.lang, ['fr', 'en'], d.lang),
   };
 }
