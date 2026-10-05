@@ -7,7 +7,7 @@ import { decodeImage, fitImageSize, IMAGE_HEADER_DIGITS, IMAGE_MAX_PIXELS, image
 import { freeDigits } from '../src/digits/free';
 import { embeddedDigits } from '../src/digits/embedded';
 import { makeFileBase, makeSubtitle, makeTitle } from '../src/ui/title';
-import { decodeParams, DEFAULTS, encodeParams } from '../src/ui/state';
+import { decodeParams, DEFAULTS, encodeParams, usesCount } from '../src/ui/state';
 
 const str = (d: Uint8Array) => Array.from(d).join('');
 const hist = (d: Uint8Array) => {
@@ -199,5 +199,15 @@ describe('image réversible (gris 8 bits)', () => {
 
 describe('divers', () => {
   it('saisie libre', () => expect(str(freeDigits('3,14 abc 15', 99))).toBe('31415'));
+  it('texte d\'exemple : se convertit et se retrouve exactement (apostrophe ’, « », …)', () => {
+    const d = textDigits(DEFAULTS.text);
+    expect(DEFAULTS.text.startsWith('Morellet, fils monstrueux de Mondrian et Picabia')).toBe(true);
+    expect(d.length).toBe(textBytes(DEFAULTS.text) * 3);
+    expect(decodeText(d)).toBe(DEFAULTS.text);
+  });
+  it('seuls les nombres ont un nombre de décimales à choisir', () => {
+    expect(['pi', 'e', 'phi', 'sqrt2'].every((x) => usesCount(x as never))).toBe(true);
+    expect(['free', 'text', 'image'].some((x) => usesCount(x as never))).toBe(false);
+  });
   it('paramètres ↔ lien', () => expect(decodeParams(encodeParams(DEFAULTS))).toEqual(DEFAULTS));
 });

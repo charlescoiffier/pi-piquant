@@ -10,7 +10,7 @@ import { createPanel } from './ui/panel';
 import { strings } from './ui/i18n';
 import { createInfo } from './ui/info';
 import { makeFileBase, makeSubtitle, makeTitle } from './ui/title';
-import { DEFAULTS, decodeParams, encodeParams, sanitize, type Params } from './ui/state';
+import { DEFAULTS, decodeParams, encodeParams, sanitize, usesCount, type Params } from './ui/state';
 
 const fromHash = () => {
   const m = location.hash.match(/#p=([^&]+)/);
@@ -72,8 +72,8 @@ function fitView() {
 
 // --- chiffres ------------------------------------------------------------
 const digitKey = (p: Params) =>
-  // texte et image sont toujours convertis en entier : « count » ne les concerne pas
-  JSON.stringify([p.source, p.source === 'text' || p.source === 'image' ? 0 : p.count, p.freeDigits, p.text, p.traversal]);
+  // chiffres libres, texte et image sont utilisés en entier : « count » ne les concerne pas
+  JSON.stringify([p.source, usesCount(p.source) ? p.count : 0, p.freeDigits, p.text, p.traversal]);
 const pathKey = (p: Params) => JSON.stringify([p.segLen, p.coef, p.firstDir]);
 
 function rebuildPath(refit = true) {

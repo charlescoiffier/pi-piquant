@@ -1,4 +1,4 @@
-import type { Params } from '../ui/state';
+import { MAX_COUNT, type Params } from '../ui/state';
 import { piDigits } from './pi';
 import { eDigits, phiDigits, sqrt2Digits } from './constants';
 import { freeDigits } from './free';
@@ -32,7 +32,7 @@ export async function getDigits(p: Params, ctx: Context): Promise<Uint8Array> {
       return { e: eDigits, phi: phiDigits, sqrt2: sqrt2Digits }[p.source](p.count);
     }
     case 'free':
-      return freeDigits(p.freeDigits, p.count);
+      return freeDigits(p.freeDigits, MAX_COUNT);
     case 'text':
       return textDigits(p.text);
     case 'image':

@@ -1,5 +1,5 @@
 import { strings, type Dict } from './i18n';
-import { LENGTH_STOPS, MAX_COUNT, MAX_SPEED, MIN_SPEED, SPEED_STOPS, WIDTH_STOPS, type Params } from './state';
+import { LENGTH_STOPS, MAX_COUNT, usesCount, MAX_SPEED, MIN_SPEED, SPEED_STOPS, WIDTH_STOPS, type Params } from './state';
 
 export interface PanelActions {
   get(): Params;
@@ -233,8 +233,8 @@ export function createPanel(host: El, a: PanelActions) {
 
     // Tracé
     body.append(section(t.section.trace,
-      ...(p.source === 'text' || p.source === 'image'
-        ? [] // texte et image : toujours converti en entier (aucune troncature)
+      ...(!usesCount(p.source)
+        ? [] // chiffres libres, texte et image : utilisés en entier (aucune troncature)
         : [field(t.count, num(p.count, 1, MAX_COUNT, 1, (v) => a.set({ count: Math.round(v) }), false))]),
       field(t.segLen, notched(p.segLen, { min: 1, max: 100, step: 0.5, stops: LENGTH_STOPS }, (v) => a.set({ segLen: v }))),
       field(t.coef, notched(p.coef, { min: 0, max: 360, step: 0.1, every: 36 }, (v) => a.set({ coef: v }))),
