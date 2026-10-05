@@ -4,7 +4,7 @@ import { DIGITS_PER_BYTE, readByte, writeByte } from './bytecode';
 const TRAVERSALS: Traversal[] = ['rows', 'serpentine', 'spiral', 'hilbert'];
 const SIDE_DIGITS = 4; // largeur et hauteur chacune sur 4 chiffres
 export const IMAGE_HEADER_DIGITS = 2 * SIDE_DIGITS + 1; // largeur, hauteur, parcours
-export const MAX_SIDE = 10 ** SIDE_DIGITS - 1;
+const MAX_SIDE = 10 ** SIDE_DIGITS - 1;
 
 /** Nombre maximal de pixels d'une image (3 chiffres par pixel, après l'en-tête). */
 export const IMAGE_MAX_PIXELS = Math.floor((MAX_COUNT - IMAGE_HEADER_DIGITS) / DIGITS_PER_BYTE);

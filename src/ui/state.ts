@@ -29,7 +29,7 @@ export const DEFAULTS: Params = {
   stroke: '#111111',
   bg: '#ffffff',
   freeDigits: '1234567890',
-  text: 'Morellet, fils monstrueux de Mondrian et Picabia, a développé depuis 1952 tout un programme de systèmes aussi rigoureux qu’absurdes, utilisant les figures les plus simples de la géométrie (droites, angles, plans…) avec les matériaux les plus divers (toiles, grillages, néons, acier, adhésifs, branches…) sur toutes sortes de supports (toiles, murs, statues, architectures, « paysages »…).',
+  text: 'Morellet, fils monstrueux de Mondrian et Picabia, a développé depuis 1952 tout un programme de systèmes aussi rigoureux qu’absurdes, utilisant les figures les plus simples de la géométrie (droites, angles, plans…) avec les matériaux les plus divers (toiles, grillages, néons, acier, adhésifs, branches…) sur toutes sortes de supports (toiles, murs, statues, architectures, « paysages »…)',
   traversal: 'rows',
   showTitle: true,
   speed: 500,
