@@ -13,19 +13,21 @@ import { makeFileBase, makeSubtitle, makeTitle } from './ui/title';
 import { DEFAULTS, decodeParams, encodeParams, sanitize, usesCount, type Params } from './ui/state';
 
 const fromHash = () => {
-  const m = location.hash.match(/#p=([^&]+)/);
-  return m ? decodeParams(m[1]) : null;
+  const fragment = location.hash.slice(1);
+  return fragment ? decodeParams(fragment) : null;
 };
 
 const randInt = (min: number, max: number) => min + Math.floor(Math.random() * (max - min + 1));
 
 // Sans lien de partage : décimales au hasard (10-200) et angle unitaire entier au hasard (1-90°)
-let params: Params = fromHash() ?? {
+const linked = fromHash();
+let params: Params = linked ?? {
   ...DEFAULTS,
   count: randInt(10, 200),
   coef: randInt(1, 90),
   lang: navigator.language.startsWith('fr') ? 'fr' : 'en',
 };
+if (!linked) resetShareUrl(); // fragment illisible (ancien lien…) : on ne le laisse pas dans la barre d'adresse
 let digits: Uint8Array = new Uint8Array(0);
 let path: PathResult = buildPath(digits, params);
 let image: ImageSource | null = null;
@@ -133,7 +135,7 @@ function flash(msg: string) {
 const downloaded = (format: string) => flash(strings(params.lang).downloaded.replace('{f}', format));
 const failed = (e: unknown) => setStatus(strings(params.lang).error + (e as Error).message);
 
-/** Le lien complet (#p=…) ne décrit plus l'état dès qu'un paramètre change : retour à l'adresse courte. */
+/** Le lien complet (#source=…) ne décrit plus l'état dès qu'un paramètre change : retour à l'adresse courte. */
 function resetShareUrl() {
   if (location.hash) history.replaceState(null, '', location.pathname + location.search);
 }
@@ -199,7 +201,7 @@ async function loadImage(file: File) {
 
 // --- exports -------------------------------------------------------------
 const exportInput = (): ExportInput => ({ points: path.points, bounds: path, style: params, title: titleLines(), fileBase: makeFileBase(params, digits.length) });
-const shareUrl = () => `${location.origin}${location.pathname}#p=${encodeParams(params)}`;
+const shareUrl = () => `${location.origin}${location.pathname}#${encodeParams(params)}`;
 
 const panel = createPanel(app, {
   get: () => params,

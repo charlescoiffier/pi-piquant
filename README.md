@@ -81,9 +81,10 @@ champ numérique accepte aussi une valeur précise saisie au clavier.
 
 - **PNG** (2048, 4096 ou 8192 pixels), **SVG** (dessin vectoriel, agrandissable sans perte) et **PDF** (A4).
   Les fichiers portent un nom explicite, par exemple `pi-piquant_10deg_100dec.png`.
-- **Copier lien** : le lien reproduit exactement le même dessin chez la personne qui l'ouvre (il contient les réglages,
-  mais pas l'image si la source en est une). La barre d'adresse affiche ce lien complet et revient à l'adresse courte
-  dès qu'un réglage change.
+- **Copier lien** : le lien reproduit exactement le même dessin chez la personne qui l'ouvre. Il est **court et
+  lisible**, par exemple `…/#source=pi&decimales=100&angle=10`, et ne mentionne que les réglages utiles ; on peut même
+  le modifier à la main (puis recharger la page). Il ne contient pas l'image si la source en est une. La barre
+  d'adresse affiche ce lien et revient à l'adresse courte dès qu'un réglage change.
 - **JSON** : enregistrer les réglages dans un fichier (↓ JSON) puis les rouvrir plus tard (↑ JSON).
 
 ### Limites
@@ -168,9 +169,34 @@ Le texte et l'image sont convertis **sans perte** en chiffres 0-9, puis tracés 
 
 ## Lien de partage
 
-Les paramètres sont sérialisés en JSON puis encodés en base64 dans le fragment de l'adresse (`#p=…`), sans passer par
-un serveur. Ils sont validés et bornés à la lecture (`sanitize`). L'image n'est pas incluse : le lien ne la reproduit
-donc pas.
+Les réglages sont écrits dans le fragment de l'adresse (`#…`, jamais envoyé à un serveur), en paires `nom=valeur`
+séparées par `&`, avec des noms en français :
+
+```
+#source=pi&decimales=100&angle=10
+#source=racine2&decimales=500&angle=17.5&sens=horaire&trait=cc3333&fond=111111
+#source=texte&angle=24&texte=François%20Morellet
+```
+
+| Paramètre | Valeurs | Écrit si… |
+|---|---|---|
+| `source` | `pi`, `e`, `phi`, `racine2`, `chiffres`, `texte`, `image` | toujours |
+| `angle` | degrés (`.` ou `,` acceptés) | toujours |
+| `decimales` | 1 à 100 000 | source π, e, φ ou √2 |
+| `chiffres`, `texte` | suite de chiffres, texte | source correspondante, si ≠ défaut |
+| `parcours` | `lignes`, `serpentin`, `spirale`, `hilbert` | source `image`, si ≠ défaut |
+| `segment`, `epaisseur`, `vitesse` | nombres | si ≠ défaut |
+| `sens` | `horaire`, `anti-horaire` | si ≠ défaut |
+| `trait`, `fond` | couleur hexadécimale sans `#` (3 ou 6 chiffres) | si ≠ défaut |
+| `titre` | `oui`, `non` | si ≠ défaut |
+| `langue` | `fr`, `en` | si ≠ défaut |
+
+`source` et `angle` (et `decimales` pour les nombres) sont toujours écrits : sans lien, l'application tire décimales et
+angle au hasard, donc un lien doit décrire un état explicite. Les clés inconnues sont ignorées et les valeurs invalides
+ramenées aux valeurs par défaut ou aux bornes (`sanitize`). Un fragment sans aucun réglage reconnu (y compris l'ancien
+format `#p=…`) ouvre l'application avec ses valeurs aléatoires. Les valeurs sont encodées comme dans une adresse
+(`%20` pour l'espace, `%26` pour `&`…), mais les caractères accentués, guillemets et emojis restent lisibles. L'image n'est
+jamais incluse. Le code est dans `encodeParams` / `decodeParams` (`src/ui/state.ts`).
 
 ## Publication
 

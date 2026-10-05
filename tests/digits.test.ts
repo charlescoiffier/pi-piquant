@@ -7,7 +7,7 @@ import { decodeImage, fitImageSize, IMAGE_HEADER_DIGITS, IMAGE_MAX_PIXELS, image
 import { freeDigits } from '../src/digits/free';
 import { embeddedDigits } from '../src/digits/embedded';
 import { makeFileBase, makeSubtitle, makeTitle } from '../src/ui/title';
-import { decodeParams, DEFAULTS, encodeParams, usesCount } from '../src/ui/state';
+import { decodeParams, DEFAULTS, encodeParams, sanitize, usesCount } from '../src/ui/state';
 
 const str = (d: Uint8Array) => Array.from(d).join('');
 const hist = (d: Uint8Array) => {
@@ -209,5 +209,73 @@ describe('divers', () => {
     expect(['pi', 'e', 'phi', 'sqrt2'].every((x) => usesCount(x as never))).toBe(true);
     expect(['free', 'text', 'image'].some((x) => usesCount(x as never))).toBe(false);
   });
-  it('paramètres ↔ lien', () => expect(decodeParams(encodeParams(DEFAULTS))).toEqual(DEFAULTS));
+
+});
+
+describe('lien de partage lisible', () => {
+  it('tout par défaut : lien minimal, source + décimales + angle', () => {
+    expect(encodeParams({ ...DEFAULTS })).toBe('source=pi&decimales=100&angle=10');
+  });
+  it('lien d\'un nombre : pas de texte ni de chiffres libres (réglages sans effet)', () => {
+    const l = encodeParams({ ...DEFAULTS, text: 'autre texte', freeDigits: '42', traversal: 'spiral', count: 350, coef: 51 });
+    expect(l).toBe('source=pi&decimales=350&angle=51');
+  });
+  it('allers-retours : chaque source avec des réglages non par défaut', () => {
+    const base = { ...DEFAULTS, segLen: 20, firstDir: 1 as const, strokeWidth: 2, stroke: '#cc3333', bg: '#111111', showTitle: false, speed: 1000, lang: 'en' as const, coef: 7.5 };
+    const cas = [
+      { ...base, source: 'pi' as const, count: 2000 },
+      { ...base, source: 'e' as const, count: 5 },
+      { ...base, source: 'phi' as const, count: 100_000 },
+      { ...base, source: 'sqrt2' as const, count: 42 },
+      { ...base, source: 'free' as const, freeDigits: '3141 5926' },
+      { ...base, source: 'text' as const, text: 'François & Co = 100 % # « Morellet » ? 日本 😀' },
+      { ...base, source: 'image' as const, traversal: 'hilbert' as const },
+    ];
+    for (const p of cas) {
+      const lien = encodeParams(p);
+      expect(lien).not.toMatch(/[\s"<>]/); // jamais d'espace ni de caractère qui casserait un lien collé dans un message
+      expect(lien).not.toContain('p=ey'); // plus de base64
+      expect(decodeParams(lien)).toEqual(sanitize(p));
+    }
+  });
+  it('les noms sont en français et les valeurs lisibles', () => {
+    const l = encodeParams({ ...DEFAULTS, source: 'sqrt2', count: 64, coef: 51, firstDir: 1, stroke: '#CC3333', showTitle: false });
+    expect(l).toBe('source=racine2&decimales=64&angle=51&sens=horaire&trait=cc3333&titre=non');
+  });
+  it('texte lisible dans le lien : accents et guillemets conservés, séparateurs encodés', () => {
+    const l = encodeParams({ ...DEFAULTS, source: 'text', text: 'François & Co « Morellet »' });
+    expect(l).toBe('source=texte&angle=10&texte=François%20%26%20Co%20«%20Morellet%20»');
+    expect(decodeParams(l)!.text).toBe('François & Co « Morellet »');
+  });
+  it('espace insécable et caractères invisibles restent encodés (aller-retour exact)', () => {
+    const t = 'a\u00a0b\u200dc\u2028d';
+    const l = encodeParams({ ...DEFAULTS, source: 'text', text: t });
+    expect(l).not.toMatch(/[\u00a0\u200d\u2028]/);
+    expect(decodeParams(l)!.text).toBe(t);
+  });
+  it('le texte d\'exemple n\'est pas répété dans le lien', () => {
+    expect(encodeParams({ ...DEFAULTS, source: 'text' })).toBe('source=texte&angle=10');
+    expect(decodeParams('source=texte&angle=10')!.text).toBe(DEFAULTS.text);
+  });
+  it('lecture tolérante : virgule décimale, couleur courte, # facultatif, % isolé, clés inconnues', () => {
+    const p = decodeParams('source=pi&angle=7,5&trait=%23c33&fond=FFF&titre=non&inconnu=1&texte=100%')!;
+    expect(p.coef).toBe(7.5);
+    expect(p.stroke).toBe('#cc3333');
+    expect(p.bg).toBe('#ffffff');
+    expect(p.showTitle).toBe(false);
+    expect(decodeParams('source=texte&texte=100%')!.text).toBe('100%');
+  });
+  it('valeurs invalides : ramenées aux bornes ou au défaut', () => {
+    const p = decodeParams('source=nimportequoi&decimales=999999999&angle=abc&sens=?&trait=zzz&vitesse=0&epaisseur=-4')!;
+    expect(p.source).toBe('pi');
+    expect(p.count).toBe(100_000);
+    expect(p.coef).toBe(DEFAULTS.coef);
+    expect(p.firstDir).toBe(DEFAULTS.firstDir);
+    expect(p.stroke).toBe(DEFAULTS.stroke);
+    expect(p.speed).toBe(1);
+    expect(p.strokeWidth).toBe(0.1);
+  });
+  it('aucun réglage reconnu (fragment vide, ancien lien #p=…, bruit) → null : ouverture aléatoire', () => {
+    for (const s of ['', 'p=eyJzb3VyY2UiOiJwaSJ9', 'abc', '&&', 'foo=bar', '=1']) expect(decodeParams(s)).toBeNull();
+  });
 });

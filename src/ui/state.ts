@@ -53,19 +53,103 @@ export const COUNT_STOPS = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000
 export const LENGTH_STOPS = [1, 2, 5, 10, 20, 50, 100];
 export const WIDTH_STOPS = [0.1, 0.2, 0.5, 1, 2, 5, 10];
 
-/** Paramètres sérialisables (tout sauf l'image, trop lourde pour une URL). */
+// --- lien de partage ------------------------------------------------------
+// Format lisible, noms en français : #source=pi&decimales=100&angle=10&sens=horaire
+// Seuls les réglages utiles sont écrits (ceux de la source choisie, et ceux qui diffèrent du défaut).
+
+const SOURCE_NAMES: Record<Source, string> = {
+  pi: 'pi', e: 'e', phi: 'phi', sqrt2: 'racine2', free: 'chiffres', text: 'texte', image: 'image',
+};
+const TRAVERSAL_NAMES: Record<Traversal, string> = {
+  rows: 'lignes', serpentine: 'serpentin', spiral: 'spirale', hilbert: 'hilbert',
+};
+const invert = <T extends string>(m: Record<T, string>) =>
+  Object.fromEntries(Object.entries(m).map(([k, v]) => [v, k])) as Record<string, T>;
+const SOURCE_BY_NAME = invert(SOURCE_NAMES);
+const TRAVERSAL_BY_NAME = invert(TRAVERSAL_NAMES);
+
+const num = (v: number) => String(Math.round(v * 1000) / 1000);
+const hex = (c: string) => c.replace('#', '').toLowerCase();
+
+/**
+ * Paramètres → fragment d'adresse (sans le « # »). `source`, `angle` et, pour π, e, φ et √2,
+ * `decimales` sont toujours écrits : sans lien, l'application tire décimales et angle au hasard,
+ * un lien doit donc décrire un état explicite. L'image n'est jamais incluse (trop lourde).
+ */
 export function encodeParams(p: Params): string {
-  return btoa(unescape(encodeURIComponent(JSON.stringify(p)))).replace(/=+$/, '');
+  const d = DEFAULTS;
+  const parts: [string, string][] = [['source', SOURCE_NAMES[p.source]]];
+  if (usesCount(p.source)) parts.push(['decimales', String(p.count)]);
+  parts.push(['angle', num(p.coef)]);
+  if (p.source === 'free' && p.freeDigits !== d.freeDigits) parts.push(['chiffres', p.freeDigits]);
+  if (p.source === 'text' && p.text !== d.text) parts.push(['texte', p.text]);
+  if (p.source === 'image' && p.traversal !== d.traversal) parts.push(['parcours', TRAVERSAL_NAMES[p.traversal]]);
+  if (p.segLen !== d.segLen) parts.push(['segment', num(p.segLen)]);
+  if (p.firstDir !== d.firstDir) parts.push(['sens', p.firstDir === 1 ? 'horaire' : 'anti-horaire']);
+  if (p.strokeWidth !== d.strokeWidth) parts.push(['epaisseur', num(p.strokeWidth)]);
+  if (hex(p.stroke) !== hex(d.stroke)) parts.push(['trait', hex(p.stroke)]);
+  if (hex(p.bg) !== hex(d.bg)) parts.push(['fond', hex(p.bg)]);
+  if (p.showTitle !== d.showTitle) parts.push(['titre', p.showTitle ? 'oui' : 'non']);
+  if (p.speed !== d.speed) parts.push(['vitesse', num(p.speed)]);
+  if (p.lang !== d.lang) parts.push(['langue', p.lang]);
+  return parts.map(([k, v]) => `${k}=${readableEscape(v)}`).join('&');
 }
 
+/**
+ * encodeURIComponent, mais les lettres accentuées, guillemets, emojis… restent lisibles dans le lien
+ * (les navigateurs les acceptent). Espaces, « & », « = », « # », « % » et caractères de contrôle restent encodés,
+ * ainsi que les espaces insécables et caractères invisibles, qu'on ne saurait pas distinguer à l'œil.
+ */
+function readableEscape(v: string): string {
+  return encodeURIComponent(v).replace(/(?:%[89A-F][0-9A-F])+/g, (run) => {
+    const text = decodeURIComponent(run);
+    return /[\s\u200b-\u200f\u2028\u2029\u2060\ufeff]/.test(text) ? run : text;
+  });
+}
+
+/**
+ * Fragment d'adresse (sans le « # ») → paramètres, ou null si aucun réglage n'est reconnu
+ * (l'application s'ouvre alors avec ses valeurs aléatoires). Clés inconnues ignorées ;
+ * valeurs invalides ramenées aux valeurs par défaut ou aux bornes par `sanitize`.
+ */
 export function decodeParams(s: string): Params | null {
-  try {
-    const padded = s + '='.repeat((4 - (s.length % 4)) % 4);
-    const obj = JSON.parse(decodeURIComponent(escape(atob(padded))));
-    return sanitize(obj);
-  } catch {
-    return null;
+  const raw: Record<string, unknown> = {};
+  let known = false;
+  for (const pair of s.split('&')) {
+    const i = pair.indexOf('=');
+    if (i <= 0) continue;
+    const key = pair.slice(0, i);
+    let val = pair.slice(i + 1);
+    try { val = decodeURIComponent(val); } catch { /* « % » isolé saisi à la main : valeur conservée telle quelle */ }
+    const number = () => Number(val.replace(',', '.'));
+    switch (key) {
+      case 'source': raw.source = SOURCE_BY_NAME[val]; break;
+      case 'decimales': raw.count = number(); break;
+      case 'angle': raw.coef = number(); break;
+      case 'chiffres': raw.freeDigits = val; break;
+      case 'texte': raw.text = val; break;
+      case 'parcours': raw.traversal = TRAVERSAL_BY_NAME[val]; break;
+      case 'segment': raw.segLen = number(); break;
+      case 'sens': raw.firstDir = val === 'horaire' ? 1 : val === 'anti-horaire' || val === 'antihoraire' ? -1 : undefined; break;
+      case 'epaisseur': raw.strokeWidth = number(); break;
+      case 'trait': raw.stroke = hexColor(val); break;
+      case 'fond': raw.bg = hexColor(val); break;
+      case 'titre': raw.showTitle = val === 'non' ? false : val === 'oui' ? true : undefined; break;
+      case 'vitesse': raw.speed = number(); break;
+      case 'langue': raw.lang = val; break;
+      default: continue; // clé inconnue
+    }
+    known = true;
   }
+  return known ? sanitize(raw) : null;
+}
+
+/** « c33 » ou « cc3333 » (avec ou sans « # ») → « #cc3333 » ; undefined si invalide. */
+function hexColor(v: string): string | undefined {
+  const h = v.replace(/^#/, '');
+  if (/^[0-9a-f]{3}$/i.test(h)) return '#' + h.split('').map((c) => c + c).join('').toLowerCase();
+  if (/^[0-9a-f]{6}$/i.test(h)) return '#' + h.toLowerCase();
+  return undefined;
 }
 
 const clamp = (v: unknown, lo: number, hi: number, d: number) => {
