@@ -288,9 +288,33 @@ curseurs relâchés, et `Échap` (ou `Entrée` pour un champ numérique) fait qu
 
 ## Version affichée
 
-`vite.config.ts` injecte `__APP_VERSION__` (de `package.json`), `__APP_COMMIT__` et `__APP_DATE__` (déclarés dans
-`src/env.d.ts`). Le commit vient de `CI_COMMIT_SHORT_SHA` dans le pipeline (l'image alpine n'a pas git), sinon de
-`git rev-parse` ; le serveur de développement affiche « développement ». `src/ui/version.ts` formate la ligne de la modale.
+Le numéro de version vient du **dernier tag Git** `vX.Y.Z`. `vite.config.ts` lance `git describe --tags --long --match 'v[0-9]*'`
+et `versionFromGit` (`scripts/version.ts`, fonction pure testée) en tire le numéro, injecté avec `__APP_VERSION__`
+(déclaré dans `src/env.d.ts`) :
+
+| Situation | Numéro affiché |
+|---|---|
+| Sur le commit taggé `v0.3.0` | `0.3.0` |
+| 4 commits après ce tag | `0.3.0+4` |
+| Pipeline d'un tag (`CI_COMMIT_TAG`) | le tag |
+| Aucun tag, ou git indisponible | le champ `version` de `package.json` (secours) |
+
+Le commit (`__APP_COMMIT__`) vient de `CI_COMMIT_SHORT_SHA` dans le pipeline, sinon de `git rev-parse` ; le serveur de
+développement affiche « développement ». La date (`__APP_DATE__`) est celle de la construction. Pour que `git describe`
+fonctionne dans le pipeline, les jobs installent git et récupèrent tout l'historique, tags compris (`GIT_DEPTH: "0"`).
+`src/ui/version.ts` formate la ligne de la modale.
+
+### Publier une version
+
+```bash
+npm version minor        # ou patch / major : met à jour package.json et package-lock.json,
+                         # crée le commit « 0.4.0 » et le tag annoté v0.4.0
+git push --follow-tags   # pousse le commit et le tag ; le pipeline reconstruit le site avec ce numéro
+```
+
+Le tag est la référence ; `package.json` est tenu à jour par `npm version` pour rester cohérent (le dépôt doit être propre
+avant la commande). Les commits suivants, jusqu'au tag suivant, s'affichent `0.4.0+N`. Les tags sont visibles dans
+**Code → Tags** sur GitLab.
 
 ## Images du README
 

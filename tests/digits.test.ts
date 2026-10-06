@@ -10,6 +10,7 @@ import { makeFileBase, makeSubtitle, makeTitle } from '../src/ui/title';
 import { darkPatch, decodeParams, DEFAULTS, encodeParams, isDark, mixColor, sanitize, usesCount, withPersonalSettings } from '../src/ui/state';
 import { clipLine, extendedLines } from '../src/geometry/extend';
 import { BUILD, REPO_URL, versionLine, versionParts } from '../src/ui/version';
+import { versionFromGit } from '../scripts/version';
 import { pickVideoType } from '../src/render/video';
 import { nextSheet } from '../src/ui/layout';
 import { strings } from '../src/ui/i18n';
@@ -610,5 +611,31 @@ describe('raccourcis clavier', () => {
     expect(darkPatch(DEFAULTS)).toEqual({ bg: '#111111', stroke: '#f2f2f2' });
     expect(isDark({ bg: '#111111' })).toBe(true);
     expect(darkPatch({ bg: '#111111' })).toEqual({ bg: '#ffffff', stroke: '#111111' });
+  });
+});
+
+describe('numéro de version tiré des tags Git', () => {
+  const secours = '0.2.0';
+  it('sur le tag : le numéro du tag, sans le « v »', () => {
+    expect(versionFromGit('v0.3.0-0-gb370633', undefined, secours)).toBe('0.3.0');
+  });
+  it('après le tag : le nombre de commits d\'écart est ajouté (« +N »)', () => {
+    expect(versionFromGit('v0.3.0-4-gb370633', undefined, secours)).toBe('0.3.0+4');
+    expect(versionFromGit('v1.0.0-12-g0123abc\n', undefined, secours)).toBe('1.0.0+12');
+  });
+  it('tag avec pré-version : conservée', () => {
+    expect(versionFromGit('v1.0.0-rc.1-0-gabc1234', undefined, secours)).toBe('1.0.0-rc.1');
+    expect(versionFromGit('v1.0.0-rc.1-2-gabc1234', undefined, secours)).toBe('1.0.0-rc.1+2');
+  });
+  it('pipeline d\'un tag : le tag de la variable CI prime', () => {
+    expect(versionFromGit('v0.2.0-3-gabc1234', 'v0.4.0', secours)).toBe('0.4.0');
+    expect(versionFromGit(null, 'v0.4.0', secours)).toBe('0.4.0');
+  });
+  it('aucun tag, git absent ou sortie inattendue : le numéro de package.json', () => {
+    expect(versionFromGit(null, undefined, secours)).toBe(secours);
+    expect(versionFromGit('', undefined, secours)).toBe(secours);
+    expect(versionFromGit('b370633', undefined, secours)).toBe(secours); // sortie de « --always » sans tag
+    expect(versionFromGit('release-3-g1234567', undefined, secours)).toBe(secours); // pas un tag de version
+    expect(versionFromGit(null, 'release-2026', secours)).toBe(secours);
   });
 });

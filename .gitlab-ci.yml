@@ -5,7 +5,16 @@
 #             sans toucher à la production (bouton « Voir l'application » sur la merge request et dans
 #             Operate > Environments). Les artefacts expirent au bout d'une semaine.
 
+# Le numéro de version affiché vient du dernier tag Git (git describe, voir scripts/version.ts) : les deux jobs
+# installent git et récupèrent tout l'historique, tags compris.
+.version-git: &version-git
+  variables:
+    GIT_DEPTH: "0"
+  before_script:
+    - apk add --no-cache git
+
 pages:
+  <<: *version-git
   image: node:22-alpine
   stage: deploy
   script:
@@ -21,6 +30,7 @@ pages:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
 review:
+  <<: *version-git
   image: node:22-alpine
   stage: test
   script:
