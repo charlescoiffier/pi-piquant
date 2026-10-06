@@ -61,14 +61,26 @@ L'écran est blanc, avec une petite fenêtre de réglages que l'on peut **dépla
   hasard : chaque visite propose un dessin différent.
 - **Langue** : français ou anglais (bouton FR/EN en haut de la fenêtre).
 - **Sur téléphone**, la fenêtre devient une **feuille en bas de l'écran**, à trois positions :
-  **fermée** (seule la poignée est visible, aucun bouton : le dessin occupe tout l'écran), **mi-ouverte** (titre, langue,
-  trois actions rapides — Animer, Copier lien, PNG — et ligne d'état) et **ouverte** (tous les réglages, qui défilent).
-  Toucher la poignée l'ouvre à moitié, puis complètement. On peut aussi la faire glisser : un **petit** glissement
-  vers le haut l'ouvre d'un cran, un petit glissement vers le bas la ferme d'un cran (de mi-ouverte à fermée, d'ouverte à
-  mi-ouverte), un **grand** glissement vers le bas la ferme d'un coup. Les commandes sont agrandies pour le tactile, et
-  le pincement zoome comme sur ordinateur.
-- **Version** : le bouton « i » affiche aussi la version de l'application, le commit correspondant et la date de
-  construction (pratique pour vérifier quelle version est en ligne).
+  **fermée** (seule la poignée est visible, aucun bouton : le dessin occupe tout l'écran), **mi-ouverte** (environ la
+  moitié de l'écran) et **ouverte** (86 % de l'écran). Le contenu est **le même que sur ordinateur, dans le même
+  ordre** (Entrée, Tracé, Style, Animation, Vue, Export, puis la ligne d'état) : Animer, Copier lien et PNG se trouvent
+  dans leurs sections, et le menu défile dès qu'il est mi-ouvert. Toucher la poignée l'ouvre à moitié, puis
+  complètement. On peut aussi la faire glisser : un **petit** glissement vers le haut l'ouvre d'un cran, un petit
+  glissement vers le bas la ferme d'un cran (d'ouverte à mi-ouverte, de mi-ouverte à fermée), un **grand** glissement
+  vers le bas la ferme d'un coup. Les commandes sont agrandies pour le tactile, et le pincement zoome comme sur ordinateur.
+- **Informations** : le bouton « i » ouvre une fenêtre à **deux onglets** : « François Morellet » (l'artiste, la série
+  pi-piquant, un lien vers son site) et « L'application » (le principe repris, la liste des raccourcis clavier, la version
+  de l'application avec le commit correspondant et la date de construction, pratique pour vérifier quelle version est en ligne).
+
+### Raccourcis clavier
+
+| Touches | Effet |
+|---|---|
+| `H` | Masquer ou afficher la fenêtre de réglages (hors champs de saisie). |
+| `Cmd` / `Ctrl` + `V` | Coller un lien de partage dans la page pour en appliquer les réglages (hors champs de saisie). |
+| `Échap` | Fermer la fenêtre d'informations. |
+| `←` / `→` | Changer d'onglet dans la fenêtre d'informations (`Début` et `Fin` : premier et dernier onglet). |
+| `Entrée` / `Espace` | Sur téléphone, ouvrir ou refermer d'un cran la feuille de réglages quand sa poignée est sélectionnée. |
 
 ### Ce que l'on peut dessiner (« Source »)
 
@@ -167,7 +179,7 @@ les images du README. Application 100 % statique, aucun serveur.
 | `src/geometry/extend.ts` | Prolongements (fonctions pures) : droite infinie ∩ rectangle (`clipLine`), prolongement de chaque segment (`extendedLines`). |
 | `src/digits/` | Sources de chiffres → `Uint8Array` de 0 à 9. `embedded.ts` (fichier JSON embarqué), `pi.ts` (API pi.delivery + cache IndexedDB, en secours), `constants.ts` (e, φ, √2, π calculés en BigInt), `free.ts`, `text.ts`, `image.ts`, `bytecode.ts` (octet ⇄ 3 chiffres). |
 | `src/render/` | `canvas.ts` (dessin, prolongements), `viewport.ts` (zoom, déplacement, pincement, cadrage), `export.ts` (PNG, SVG, PDF, JSON ; `paintExport` commun au PNG et à la vidéo), `video.ts` (enregistrement vidéo). |
-| `src/ui/` | `panel.ts` (fenêtre de réglages et feuille mobile), `info.ts` (modale « À propos »), `i18n.ts` (FR/EN), `state.ts` (paramètres, bornes, lien), `title.ts` (légende et noms de fichiers), `version.ts` (version affichée), `layout.ts` (seuil mobile). |
+| `src/ui/` | `panel.ts` (fenêtre de réglages et feuille mobile), `info.ts` (modale à deux onglets), `i18n.ts` (FR/EN), `state.ts` (paramètres, bornes, lien), `title.ts` (légende et noms de fichiers), `version.ts` (version affichée), `layout.ts` (seuil mobile). |
 | `src/data/digits.json` | 100 000 chiffres de π, e, φ, √2 (400 Ko), généré par `scripts/generate-digits.ts`. |
 | `scripts/` | `generate-digits.ts` (données), `capture-readme.mjs` (images du README). |
 | `docs/images/` | Captures et GIF du README (générés par `npm run capture:readme`). |
@@ -210,9 +222,10 @@ bascule de `requestAnimationFrame` à un minuteur pour aller au bout (images plu
 Sous 640 px de large (`MOBILE_QUERY` dans `src/ui/layout.ts`, repris par la media query de `src/style.css`), la fenêtre de
 réglages devient une **feuille à trois positions** (`Sheet` : `closed`, `half`, `full`). Sa hauteur est fixe (86 % de l'écran,
 720 px au plus) et c'est une translation qui la déplace ; `panel.ts` mesure les décalages de chaque position
-(`sheetOffsets` : poignée seule, jusqu'à la ligne d'état, ou entièrement visible, en tenant compte de la zone sûre du
+(`sheetOffsets` : poignée seule, environ 46 % de l'écran, ou entièrement visible, en tenant compte de la zone sûre du
 bas des téléphones) puis la place (`applySheet`). L'en-tête mobile est une poignée (`.grip`) suivie du titre et de la
-langue ; le contenu ne défile que feuille ouverte.
+langue ; le contenu est le même que sur ordinateur, dans le même ordre. Il défile dès que la feuille est mi-ouverte : le
+bas de la feuille étant hors écran, `applySheet` limite alors la hauteur du corps à la partie visible (`max-height`).
 
 Pendant un glissement sur l'en-tête, la feuille suit le doigt ; au relâchement, `nextSheet` (fonction pure, testée, dans
 `src/ui/layout.ts`) choisit la position selon le geste. **Seule la distance compte**, pas la vitesse : toucher
@@ -221,6 +234,16 @@ voisine ; glissement « grand » (≥ 30 % de la hauteur, 150 px au moins) : d'o
 La poignée est aussi utilisable au clavier (Entrée ou Espace, équivalent à un toucher, `aria-expanded`). Les champs ont
 16 px (pas de zoom automatique sur iOS) et les cibles tactiles 34 px. `fitView` réserve une marge basse pour que le dessin
 reste au-dessus de la poignée (`Viewport.fit` accepte des marges haute et basse).
+
+## Modale d'information
+
+`src/ui/info.ts` construit une modale à deux onglets selon le motif ARIA (`tablist`, `tab`, `tabpanel`) : navigation aux
+flèches gauche et droite, `Début` et `Fin`, un seul onglet dans l'ordre de tabulation (tabindex itinérant). Les deux
+panneaux occupent la même cellule d'une grille (`visibility: hidden` pour l'inactif) : la fenêtre garde la hauteur du plus
+grand et ne saute pas d'un onglet à l'autre. Les textes sont dans `src/ui/i18n.ts` (`info`), dont la liste des
+raccourcis (`shortcuts`, une entrée par raccourci, les touches étant rendues en `<kbd>`) ; un test vérifie que les deux
+langues restent synchronisées. Le raccourci `H` est géré dans `src/main.ts` (ignoré avec `Ctrl`, `Cmd` ou `Alt`, dans les
+champs de saisie et pendant que la modale est ouverte).
 
 ## Version affichée
 

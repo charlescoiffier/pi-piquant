@@ -309,7 +309,8 @@ addEventListener('paste', (e) => {
 });
 
 addEventListener('keydown', (e) => {
-  if (e.key === 'h' && !(e.target as HTMLElement).closest('input,textarea,select')) {
+  const modalOpen = !!document.querySelector('.info-overlay:not([hidden])');
+  if (e.key.toLowerCase() === 'h' && !e.ctrlKey && !e.metaKey && !e.altKey && !modalOpen && !(e.target as Element | null)?.closest?.('input,textarea,select')) {
     document.querySelector('.panel')?.classList.toggle('hidden');
   }
 });

@@ -142,9 +142,34 @@ button.info {
   h3 { font-size: 10.5px; }
   button.info { width: 30px; height: 30px; font-size: 13px; }
   .row { gap: 6px; margin-bottom: 8px; }
-  .quick { margin-top: 8px; margin-bottom: 0; }
   .foot { margin-top: 6px; margin-bottom: 4px; }
   section:first-of-type { margin-top: 6px; }
   .caption { top: 14px; bottom: auto; left: 14px; font-size: 11.5px; }
   .info-dialog { font-size: 13.5px; }
+}
+
+/* Modale d'information à onglets */
+.info-tabs { display: flex; gap: 2px; margin: -6px 0 14px; border-bottom: 1px solid var(--line); }
+.info-tabs button {
+  height: 32px; padding: 0 12px; border: 0; border-bottom: 2px solid transparent; border-radius: 0;
+  background: none; color: var(--muted); font-size: 12.5px; margin-bottom: -1px;
+}
+.info-tabs button:hover { color: var(--ink); background: none; }
+.info-tabs button[aria-selected=true] { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
+.info-panels { display: grid; }
+.info-panel { grid-area: 1 / 1; min-width: 0; }
+.info-panel[hidden] { display: block; visibility: hidden; } /* garde la place : la fenêtre ne change pas de hauteur */
+.info-dialog h3 { margin: 14px 0 8px; }
+.shortcuts { display: grid; grid-template-columns: max-content 1fr; gap: 7px 14px; margin: 0; align-items: baseline; }
+.shortcuts dt { white-space: nowrap; }
+.shortcuts dd { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.4; }
+kbd {
+  font: inherit; font-size: 11px; padding: 1px 6px; border: 1px solid var(--line); border-bottom-width: 2px;
+  border-radius: 4px; background: #f7f7fa; color: var(--ink); white-space: nowrap;
+}
+@media (max-width: 640px) {
+  .info-tabs button { height: 38px; font-size: 13.5px; }
+  .shortcuts { grid-template-columns: 1fr; gap: 3px; }
+  .shortcuts dt { margin-top: 8px; }
+  .shortcuts dd { font-size: 13px; }
 }

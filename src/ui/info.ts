@@ -1,14 +1,30 @@
 import { strings } from './i18n';
-import { BUILD, versionParts } from './version';
 import type { Lang } from './state';
+import { BUILD, versionParts } from './version';
 
 const SITE = 'https://francoismorellet.com/';
 
-/** Seconde modale : présentation de l'œuvre de François Morellet et du principe repris par l'application. */
+const el = <K extends keyof HTMLElementTagNameMap>(tag: K, props: Record<string, string> = {}, ...kids: (Node | string)[]) => {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(props)) e.setAttribute(k, v);
+  e.append(...kids);
+  return e;
+};
+
+const link = (href: string, text: string) => el('a', { href, target: '_blank', rel: 'noopener noreferrer' }, text);
+
+/** « Cmd / Ctrl + V » → une touche <kbd> par élément, séparateurs en texte. */
+function keys(spec: string): Node[] {
+  return spec.split(/( \+ | \/ )/).map((part) => (/^ [+/] $/.test(part) ? document.createTextNode(part) : el('kbd', {}, part)));
+}
+
+/**
+ * Modale d'information à deux onglets :
+ *  - « François Morellet » : l'artiste, la série pi-piquant, lien vers son site ;
+ *  - « L'application » : le principe repris, les raccourcis clavier, la version.
+ */
 export function createInfo(host: HTMLElement, getLang: () => Lang) {
-  const overlay = document.createElement('div');
-  overlay.className = 'info-overlay';
-  overlay.setAttribute('data-ui', '');
+  const overlay = el('div', { class: 'info-overlay', 'data-ui': '' });
   overlay.hidden = true;
   host.append(overlay);
 
@@ -27,54 +43,62 @@ export function createInfo(host: HTMLElement, getLang: () => Lang) {
 
   function open() {
     const t = strings(getLang()).info;
-    const dlg = document.createElement('div');
-    dlg.className = 'info-dialog';
-    dlg.setAttribute('role', 'dialog');
-    dlg.setAttribute('aria-modal', 'true');
-    dlg.setAttribute('aria-label', t.label);
 
-    const h = document.createElement('h2');
-    h.textContent = t.title;
-    const paras = [t.p1, t.p2, t.p3].map((txt) => {
-      const p = document.createElement('p');
-      p.textContent = txt;
-      return p;
-    });
-    const link = document.createElement('a');
-    link.href = SITE;
-    link.target = '_blank';
-    link.rel = 'noopener noreferrer';
-    link.textContent = `${t.link} →`;
-    const linkP = document.createElement('p');
-    linkP.append(link);
+    // --- onglet 1 : François Morellet
+    const morellet = [
+      el('h2', {}, t.title),
+      el('p', {}, t.p1),
+      el('p', {}, t.p2),
+      el('p', {}, link(SITE, `${t.link} →`)),
+    ];
 
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.textContent = t.close;
-    btn.addEventListener('click', close);
-    const actions = document.createElement('div');
-    actions.className = 'right';
-    actions.append(btn);
-
-    // ligne discrète : version, commit (lien), date de build, code source (lien)
-    const version = document.createElement('p');
-    version.className = 'version';
+    // --- onglet 2 : l'application (principe, raccourcis clavier, version)
+    const shortcuts = el('dl', { class: 'shortcuts' });
+    for (const s of t.shortcuts) shortcuts.append(el('dt', {}, ...keys(s.keys)), el('dd', {}, s.text));
+    const version = el('p', { class: 'version' });
     versionParts(getLang(), BUILD).forEach((part, i) => {
       if (i) version.append(' · ');
-      if (part.href) {
-        const a = document.createElement('a');
-        a.href = part.href;
-        a.target = '_blank';
-        a.rel = 'noopener noreferrer';
-        a.textContent = part.text;
-        version.append(a);
-      } else version.append(part.text);
+      version.append(part.href ? link(part.href, part.text) : part.text);
+    });
+    const app = [el('h2', {}, t.appTitle), el('p', {}, t.app), el('h3', {}, t.shortcutsTitle), shortcuts, version];
+
+    // --- onglets (ARIA : tablist / tab / tabpanel, flèches gauche-droite, Début, Fin)
+    const defs = [
+      { id: 'morellet', label: t.tabMorellet, content: morellet },
+      { id: 'app', label: t.tabApp, content: app },
+    ];
+    const tabs = defs.map((d) => el('button', { type: 'button', role: 'tab', id: `info-tab-${d.id}`, 'aria-controls': `info-panel-${d.id}` }, d.label));
+    // les deux panneaux occupent la même cellule : la fenêtre garde la hauteur du plus grand et ne saute pas d'un onglet à l'autre
+    const panels = defs.map((d) => el('div', { class: 'info-panel', role: 'tabpanel', id: `info-panel-${d.id}`, 'aria-labelledby': `info-tab-${d.id}` }, ...d.content));
+    const select = (i: number, focus = false) => {
+      tabs.forEach((tab, k) => {
+        tab.setAttribute('aria-selected', String(k === i));
+        tab.tabIndex = k === i ? 0 : -1;
+        panels[k].hidden = k !== i;
+      });
+      if (focus) tabs[i].focus();
+    };
+    tabs.forEach((tab, i) => tab.addEventListener('click', () => select(i)));
+    const tablist = el('div', { class: 'info-tabs', role: 'tablist', 'aria-label': t.label }, ...tabs);
+    tablist.addEventListener('keydown', (e) => {
+      const cur = tabs.findIndex((x) => x.getAttribute('aria-selected') === 'true');
+      const next = { ArrowRight: (cur + 1) % tabs.length, ArrowLeft: (cur - 1 + tabs.length) % tabs.length, Home: 0, End: tabs.length - 1 }[e.key];
+      if (next === undefined) return;
+      e.preventDefault();
+      select(next, true);
     });
 
-    dlg.append(h, ...paras, linkP, version, actions);
+    const closeBtn = el('button', { type: 'button' }, t.close);
+    closeBtn.addEventListener('click', close);
+
+    const dlg = el('div', { class: 'info-dialog', role: 'dialog', 'aria-modal': 'true', 'aria-label': t.label },
+      tablist,
+      el('div', { class: 'info-panels' }, ...panels),
+      el('div', { class: 'right' }, closeBtn),
+    );
     overlay.replaceChildren(dlg);
     overlay.hidden = false;
-    btn.focus();
+    select(0, true);
   }
 
   return { open, close };

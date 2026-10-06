@@ -12,6 +12,7 @@ import { clipLine, extendedLines } from '../src/geometry/extend';
 import { BUILD, REPO_URL, versionLine, versionParts } from '../src/ui/version';
 import { pickVideoType } from '../src/render/video';
 import { nextSheet } from '../src/ui/layout';
+import { strings } from '../src/ui/i18n';
 import { drawPath } from '../src/render/canvas';
 
 const str = (d: Uint8Array) => Array.from(d).join('');
@@ -472,5 +473,34 @@ describe('feuille mobile : position après un geste sur la poignée', () => {
     expect(nextSheet('full', 320, 600, H)).toBe('closed');
     expect(nextSheet('full', 15, 400, H)).toBe('full');
     expect(nextSheet('full', -80, 300, H)).toBe('full'); // vers le haut : reste ouverte
+  });
+});
+
+describe('modale d\'information : textes des deux onglets', () => {
+  const fr = strings('fr').info;
+  const en = strings('en').info;
+  it('mêmes clés en français et en anglais', () => {
+    expect(Object.keys(en).sort()).toEqual(Object.keys(fr).sort());
+  });
+  it('onglet « François Morellet » : titre, deux paragraphes, lien ; onglet « application » : principe et raccourcis', () => {
+    for (const t of [fr, en]) {
+      expect(t.tabMorellet).toBe('François Morellet');
+      expect(t.p1.length).toBeGreaterThan(50);
+      expect(t.p2).toContain('pi-piquant');
+      expect(t.app).toContain('François Morellet'); // le principe se lit sans le premier onglet
+      expect(t.app).toContain('pi-piquant');
+    }
+  });
+  it('mêmes raccourcis dans les deux langues (même structure de touches), chacun avec une explication', () => {
+    // les légendes diffèrent (Échap / Esc, Entrée / Enter) : on compare le nombre de touches et leurs séparateurs
+    const forme = (k: string) => k.split(/ [+/] /).length + (k.match(/ [+/] /g) ?? []).join('');
+    expect(en.shortcuts.map((x) => forme(x.keys))).toEqual(fr.shortcuts.map((x) => forme(x.keys)));
+    for (const t of [fr, en]) {
+      expect(t.shortcuts.length).toBeGreaterThanOrEqual(5);
+      for (const x of t.shortcuts) expect(x.text.length).toBeGreaterThan(10);
+    }
+  });
+  it('raccourcis annoncés : H, collage d\'un lien, fermeture, changement d\'onglet, poignée mobile', () => {
+    expect(fr.shortcuts.map((x) => x.keys)).toEqual(['H', 'Cmd / Ctrl + V', 'Échap', '← / →', 'Entrée / Espace']);
   });
 });

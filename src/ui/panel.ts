@@ -62,11 +62,10 @@ export function createPanel(host: El, a: PanelActions) {
   function sheetOffsets() {
     const height = panel.offsetHeight;
     const grip = header.querySelector<HTMLElement>('.grip');
-    const foot = body.querySelector<HTMLElement>('.foot');
-    const safe = safeBottom();
-    const closedVisible = (grip?.offsetHeight ?? 30) + safe; // poignée seule
-    const halfVisible = foot ? foot.offsetTop + foot.offsetHeight + 8 + safe : closedVisible; // + titre, actions rapides, ligne d'état
-    return { closed: height - closedVisible, half: height - halfVisible, full: 0 };
+    const closedVisible = (grip?.offsetHeight ?? 30) + safeBottom(); // poignée seule
+    // mi-ouverte : environ la moitié de l'écran (titre et début des réglages)
+    const halfVisible = Math.min(height - 40, Math.max(280, Math.round(window.innerHeight * 0.46)));
+    return { closed: height - closedVisible, half: height - halfVisible, full: 0, halfVisible };
   }
 
   /** Place la feuille sur sa position (avec animation) ; sans effet sur bureau. */
@@ -78,9 +77,12 @@ export function createPanel(host: El, a: PanelActions) {
       delete panel.dataset.sheet;
       return;
     }
+    const off = sheetOffsets();
     panel.style.transition = '';
-    panel.style.transform = `translateY(${sheetOffsets()[sheet]}px)`;
-    body.style.overflowY = sheet === 'full' ? 'auto' : 'hidden'; // le contenu ne défile que feuille ouverte
+    panel.style.transform = `translateY(${off[sheet]}px)`;
+    // mi-ouverte ou ouverte : le menu défile. Mi-ouverte, le corps est limité à la partie visible (le bas de la feuille est hors écran).
+    body.style.overflowY = sheet === 'closed' ? 'hidden' : 'auto';
+    body.style.maxHeight = sheet === 'half' ? `${off.halfVisible - header.offsetHeight - safeBottom()}px` : '';
     panel.dataset.sheet = sheet;
     header.querySelector('.grip')?.setAttribute('aria-expanded', String(sheet !== 'closed'));
   }
@@ -269,15 +271,6 @@ export function createPanel(host: El, a: PanelActions) {
       });
       header.append(grip, h('div', { class: 'sheet-title' }, title, h('span', { class: 'spacer' }), langBtn));
       panel.classList.remove('collapsed');
-      // feuille mi-ouverte : les trois actions principales et la ligne d'état, juste sous le titre
-      body.append(
-        h('div', { class: 'row quick' },
-          button(playing ? t.pause : t.play, () => a.togglePlay()),
-          button(t.copyLink, () => a.copyLink()),
-          button(t.png, () => a.exportPng(Number(pngSizeValue))),
-        ),
-        footer(),
-      );
     } else {
       const fold = button(collapsed ? '+' : '–', () => {
         collapsed = !collapsed;
@@ -401,8 +394,8 @@ export function createPanel(host: El, a: PanelActions) {
       ),
     ));
 
-    if (!mobile) body.append(footer());
-    else {
+    body.append(footer()); // même organisation que sur ordinateur : les sections, puis la ligne d'état
+    if (mobile) {
       applySheet();
       requestAnimationFrame(applySheet); // mesures définitives une fois la mise en page terminée
     }
