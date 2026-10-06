@@ -9,6 +9,18 @@ lignes brisées, d'après la série « pi-piquant » de François Morellet.
 
 Aucune installation : tout se passe dans le navigateur, et rien n'est envoyé à un serveur.
 
+## Aperçu
+
+![Un dessin qui se construit segment par segment, avec ses prolongements](docs/images/animation.gif)
+
+| Sur ordinateur | Avec les prolongements des segments |
+|---|---|
+| ![L'application sur ordinateur : un dessin de π et la fenêtre de réglages](docs/images/apercu-bureau.png) | ![Un dessin dont les segments sont prolongés en fines droites grises](docs/images/prolongements.png) |
+
+| Sur téléphone | Réglages sur téléphone | Un texte devient un dessin |
+|---|---|---|
+| ![L'application sur téléphone, fenêtre repliée en bas de l'écran](docs/images/mobile.png) | ![La fenêtre de réglages dépliée sur téléphone](docs/images/mobile-reglages.png) | ![Le dessin d'un texte](docs/images/texte.png) |
+
 ---
 
 # Pour tout le monde
@@ -48,6 +60,11 @@ L'écran est blanc, avec une petite fenêtre de réglages que l'on peut **dépla
 - **À l'ouverture**, le nombre de décimales (entre 10 et 200) et l'angle unitaire (entre 1° et 90°) sont tirés au
   hasard : chaque visite propose un dessin différent.
 - **Langue** : français ou anglais (bouton FR/EN en haut de la fenêtre).
+- **Sur téléphone**, la fenêtre devient une **feuille en bas de l'écran** : repliée, elle montre seulement trois actions
+  (Animer, Copier lien, PNG) pour laisser le dessin visible ; toucher son en-tête la déplie (environ la moitié de
+  l'écran). Les commandes sont agrandies pour le tactile, et le pincement zoome comme sur ordinateur.
+- **Version** : le bouton « i » affiche aussi la version de l'application, le commit correspondant et la date de
+  construction (pratique pour vérifier quelle version est en ligne).
 
 ### Ce que l'on peut dessiner (« Source »)
 
@@ -72,6 +89,7 @@ toujours utilisé en entier, sans réglage du nombre de décimales.
 | Sens 1er angle | Anti-horaire (comme dans l'œuvre) ou horaire : donne l'image miroir. |
 | Trait, Fond, Épaisseur | Couleurs et épaisseur de la ligne ; un bouton « Mode sombre » inverse fond et trait. |
 | Titre | Affiche ou masque la légende sous le dessin (à l'écran et dans les exports). |
+| Prolongements, Intensité | Prolonge chaque segment en une fine droite grise qui traverse tout l'écran, comme sur l'estampe de référence ; l'intensité règle la force de ce gris (de 5 à 100 %). Les prolongements suivent aussi l'animation et sont présents dans les exports. |
 | Animation | « Animer » dessine le tracé segment par segment (de 1 à 5000 segments par seconde) ; « Tout afficher » termine l'animation. |
 
 Les curseurs ont des **crans** (petits repères sous la piste) pour retrouver facilement des valeurs courantes, et chaque
@@ -81,10 +99,14 @@ champ numérique accepte aussi une valeur précise saisie au clavier.
 
 - **PNG** (2048, 4096 ou 8192 pixels), **SVG** (dessin vectoriel, agrandissable sans perte) et **PDF** (A4).
   Les fichiers portent un nom explicite, par exemple `pi-piquant_10deg_100dec.png`.
+- **Vidéo** : enregistre l'animation du dessin en **MP4** (ou **WebM** selon le navigateur), 1080 pixels sur le grand
+  côté, légende comprise. On choisit la **durée** (de 3 à 60 secondes) : elle remplace la vitesse d'animation pour
+  l'enregistrement, donc un dessin de 100 000 segments tient aussi dans 10 secondes. Le bouton devient « Annuler »
+  pendant l'enregistrement, qui se fait en temps réel ; mieux vaut garder l'onglet visible.
 - **Copier lien** : le lien reproduit le même dessin chez la personne qui l'ouvre. Il est **lisible** et contient les
   réglages du dessin (source, décimales, longueur du segment, angle unitaire, sens du premier angle, couleurs du trait
-  et du fond, épaisseur), par exemple
-  `…/#source=pi&decimales=100&segment=10&angle=10&sens=anti-horaire&trait=111111&fond=ffffff&epaisseur=0.5`.
+  et du fond, épaisseur, prolongements), par exemple
+  `…/#source=pi&decimales=100&segment=10&angle=10&sens=anti-horaire&trait=111111&fond=ffffff&epaisseur=0.5&prolongements=non`.
   Il ne contient ni l'animation, ni la langue, ni l'affichage du titre (préférences personnelles), ni l'image si la
   source en est une. On peut le modifier à la main. La barre d'adresse affiche ce lien et revient à l'adresse courte
   dès qu'un réglage change.
@@ -98,6 +120,9 @@ champ numérique accepte aussi une valeur précise saisie au clavier.
 - Texte : environ 33 000 octets (une lettre ordinaire = 1 octet, une lettre accentuée = 2, un emoji = 4).
 - Image : environ 33 000 pixels ; une image plus grande est réduite automatiquement à l'import (le message en bas
   de la fenêtre l'indique).
+- Prolongements : limités aux 5 000 premiers segments (un message le signale), car au-delà ils ne se distinguent plus.
+- Vidéo : nécessite un navigateur récent (Chrome, Edge, Safari ou Firefox à jour) ; les vidéos de très grands
+  dessins demandent un ordinateur correct.
 - Pour retrouver le contenu depuis le dessin, l'angle unitaire doit rester **inférieur ou égal à 36°** : au-delà,
   des chiffres différents donnent le même angle (à 90°, les chiffres 1, 5 et 9 sont identiques).
 
@@ -116,6 +141,7 @@ npm test           # tests unitaires (Vitest)
 npm run build      # vérification des types + build de production dans dist/
 npm run preview    # sert le build de production
 npm run generate:digits   # régénère src/data/digits.json (100 000 chiffres de π, e, φ, √2)
+npm run capture:readme    # régénère les images du README (docs/images/) : Chrome et ffmpeg requis
 ```
 
 Pour la régénération des données, `npx vite-node scripts/generate-digits.ts --verify` recoupe en plus π avec
@@ -125,7 +151,8 @@ l'API pi.delivery à quatre positions.
 
 TypeScript + [Vite](https://vite.dev/), sans framework : rendu **Canvas 2D**, interface en DOM natif.
 [Vitest](https://vitest.dev/) pour les tests, [jsPDF](https://github.com/parallax/jsPDF) pour l'export PDF
-(chargé à la demande). Application 100 % statique, aucun serveur.
+(chargé à la demande), `MediaRecorder` (natif) pour l'export vidéo, [puppeteer-core](https://pptr.dev/) pour générer
+les images du README. Application 100 % statique, aucun serveur.
 
 ## Organisation du code
 
@@ -133,11 +160,14 @@ TypeScript + [Vite](https://vite.dev/), sans framework : rendu **Canvas 2D**, in
 |---|---|
 | `src/main.ts` | Orchestration : état, recalcul, animation, zoom, exports, lien de partage, messages d'état. |
 | `src/geometry/path.ts` | Règle de tracé (fonction pure) : chiffres → points. |
+| `src/geometry/extend.ts` | Prolongements (fonctions pures) : droite infinie ∩ rectangle (`clipLine`), prolongement de chaque segment (`extendedLines`). |
 | `src/digits/` | Sources de chiffres → `Uint8Array` de 0 à 9. `embedded.ts` (fichier JSON embarqué), `pi.ts` (API pi.delivery + cache IndexedDB, en secours), `constants.ts` (e, φ, √2, π calculés en BigInt), `free.ts`, `text.ts`, `image.ts`, `bytecode.ts` (octet ⇄ 3 chiffres). |
-| `src/render/` | `canvas.ts` (dessin), `viewport.ts` (zoom, déplacement, pincement), `export.ts` (PNG, SVG, PDF, JSON). |
-| `src/ui/` | `panel.ts` (fenêtre de réglages), `info.ts` (modale « À propos »), `i18n.ts` (FR/EN), `state.ts` (paramètres, bornes, lien), `title.ts` (légende et noms de fichiers). |
+| `src/render/` | `canvas.ts` (dessin, prolongements), `viewport.ts` (zoom, déplacement, pincement, cadrage), `export.ts` (PNG, SVG, PDF, JSON ; `paintExport` commun au PNG et à la vidéo), `video.ts` (enregistrement vidéo). |
+| `src/ui/` | `panel.ts` (fenêtre de réglages et feuille mobile), `info.ts` (modale « À propos »), `i18n.ts` (FR/EN), `state.ts` (paramètres, bornes, lien), `title.ts` (légende et noms de fichiers), `version.ts` (version affichée), `layout.ts` (seuil mobile). |
 | `src/data/digits.json` | 100 000 chiffres de π, e, φ, √2 (400 Ko), généré par `scripts/generate-digits.ts`. |
-| `tests/digits.test.ts` | Tests : géométrie, constantes, conversions, aller-retour texte/image, titre, paramètres. |
+| `scripts/` | `generate-digits.ts` (données), `capture-readme.mjs` (images du README). |
+| `docs/images/` | Captures et GIF du README (générés par `npm run capture:readme`). |
+| `tests/digits.test.ts` | Tests : géométrie, prolongements, constantes, conversions, aller-retour texte/image, titre, paramètres et lien, version, tracé progressif. |
 
 ## Données de π et des constantes
 
@@ -153,6 +183,44 @@ ne servent que de secours si le fichier est indisponible. Les suites commencent 
 `180° ± (d || 10) × angleUnitaire` (le signe s'inverse à chaque sommet, le premier suit le réglage « Sens 1er angle »), puis
 on avance d'un segment. *n* chiffres donnent donc *n + 1* segments. L'épaisseur du trait est exprimée en unités du dessin
 (avec un minimum de 0,4 px à l'écran), pour que le dessin reste identique à toutes les échelles.
+
+## Prolongements des segments
+
+Chaque segment est prolongé en droite infinie, découpée par la zone visible (`clipLine`, méthode de Liang-Barsky, dans
+`src/geometry/extend.ts`). `drawPath` (`src/render/canvas.ts`) les trace **avant** le tracé, en un seul chemin, avec un gris
+obtenu en **mélangeant le trait et le fond** (`mixColor`) plutôt qu'avec de la transparence : le rendu est identique à l'écran,
+en PNG, en SVG (un `<path>`) et en PDF. Épaisseur : le quart de celle du trait. Dans les exports, les droites sont
+découpées par la zone du dessin et ne traversent pas la légende. Plafond : `EXTEND_MAX_SEGMENTS` (5 000).
+
+## Export vidéo
+
+`recordVideo` (`src/render/video.ts`) dessine l'œuvre sur un canvas hors écran avec le même code que l'export PNG
+(`paintExport`), en faisant croître le nombre de segments affichés de façon linéaire pendant la durée choisie (le
+dernier segment pousse progressivement), puis enregistre le flux avec `MediaRecorder` (`captureStream`). Format choisi par
+`pickVideoType` : MP4 (`avc1`) si le navigateur le sait enregistrer, sinon WebM (VP9, VP8). Dimensions paires (exigence de
+H.264), 30 images/s, 8 Mbit/s, arrêt sur l'image finale de 0,5 s, annulation par `AbortSignal`. Onglet masqué : la boucle
+bascule de `requestAnimationFrame` à un minuteur pour aller au bout (images plus rares).
+
+## Version mobile
+
+Sous 640 px de large (`MOBILE_QUERY` dans `src/ui/layout.ts`, repris par la media query de `src/style.css`), la fenêtre de
+réglages devient une feuille en bas de l'écran : repliée par défaut, avec une barre d'actions rapides (`panel.ts`) ; l'en-tête
+n'est plus déplaçable mais se touche pour replier ou déplier ; les champs ont 16 px (pas de zoom automatique sur iOS) et les
+cibles tactiles 34 px. `fitView` réserve une marge basse pour que le dessin reste au-dessus de la feuille repliée
+(`Viewport.fit` accepte des marges haute et basse).
+
+## Version affichée
+
+`vite.config.ts` injecte `__APP_VERSION__` (de `package.json`), `__APP_COMMIT__` et `__APP_DATE__` (déclarés dans
+`src/env.d.ts`). Le commit vient de `CI_COMMIT_SHORT_SHA` dans le pipeline (l'image alpine n'a pas git), sinon de
+`git rev-parse` ; le serveur de développement affiche « développement ». `src/ui/version.ts` formate la ligne de la modale.
+
+## Images du README
+
+`npm run capture:readme` (`scripts/capture-readme.mjs`) construit l'application, la sert avec `vite preview`, pilote Chrome
+avec `puppeteer-core` sur des liens à réglages fixes (captures reproductibles, bureau et mobile) et enregistre l'animation
+avec le vrai bouton « Vidéo », puis la convertit en GIF carré avec `ffmpeg` (palette optimisée, sous 3 Mo). Prérequis :
+Google Chrome (ou `CHROME_PATH`) et `ffmpeg`. Les images sont écrites dans `docs/images/` et versionnées.
 
 ## Conversions réversibles (texte et image)
 
@@ -178,8 +246,8 @@ Les réglages du dessin sont écrits dans le fragment de l'adresse (`#…`, jama
 `nom=valeur` séparées par `&`, avec des noms en français :
 
 ```
-#source=pi&decimales=100&segment=10&angle=10&sens=anti-horaire&trait=111111&fond=ffffff&epaisseur=0.5
-#source=texte&segment=10&angle=24&sens=horaire&trait=cc3333&fond=111111&epaisseur=0.5&texte=François%20Morellet
+#source=pi&decimales=100&segment=10&angle=10&sens=anti-horaire&trait=111111&fond=ffffff&epaisseur=0.5&prolongements=non
+#source=texte&segment=10&angle=24&sens=horaire&trait=cc3333&fond=111111&epaisseur=0.5&prolongements=oui&intensite=30&texte=François%20Morellet
 ```
 
 | Paramètre | Valeurs | Écrit pour… |
@@ -191,6 +259,8 @@ Les réglages du dessin sont écrits dans le fragment de l'adresse (`#…`, jama
 | `sens` | `horaire`, `anti-horaire` (sens du premier angle) | toutes les sources |
 | `trait`, `fond` | couleur hexadécimale sans `#` (3 ou 6 chiffres en lecture) | toutes les sources |
 | `epaisseur` | épaisseur du trait | toutes les sources |
+| `prolongements` | `oui`, `non` | toutes les sources |
+| `intensite` | 5 à 100 (en %) | si `prolongements=oui` |
 | `chiffres`, `texte` | suite de chiffres, texte (en fin de lien) | source `chiffres`, source `texte` |
 | `parcours` | `lignes`, `serpentin`, `spirale`, `hilbert` (en fin de lien) | source `image` |
 

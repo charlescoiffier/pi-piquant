@@ -3,14 +3,16 @@ import { buildPath, segmentCount, type PathResult } from './geometry/path';
 import { getDigits, type ImageSource } from './digits';
 import { fitImageSize } from './digits/image';
 import { TEXT_MAX_BYTES, textBytes } from './digits/text';
-import { Stage } from './render/canvas';
+import { Stage, type ExtendStyle } from './render/canvas';
 import { Viewport } from './render/viewport';
-import { exportParams, exportPdf, exportPng, exportSvg, type ExportInput } from './render/export';
+import { download, exportParams, exportPdf, exportPng, exportSvg, type ExportInput } from './render/export';
+import { recordVideo, videoSupported } from './render/video';
 import { createPanel } from './ui/panel';
 import { strings } from './ui/i18n';
 import { createInfo } from './ui/info';
+import { isMobile } from './ui/layout';
 import { makeFileBase, makeSubtitle, makeTitle } from './ui/title';
-import { DEFAULTS, decodeParams, encodeParams, sanitize, usesCount, withPersonalSettings, type Params } from './ui/state';
+import { DEFAULTS, EXTEND_MAX_SEGMENTS, decodeParams, encodeParams, mixColor, sanitize, usesCount, withPersonalSettings, type Params } from './ui/state';
 
 const fromHash = () => {
   const fragment = location.hash.slice(1);
@@ -61,14 +63,22 @@ function syncShowAll() {
   panel.setCanShowAll(playing || shown < segments());
 }
 
+/** Prolongements des segments : trait mélangé au fond (jamais de transparence), quatre fois plus fin que le trait. */
+function extendStyle(): ExtendStyle | undefined {
+  if (!params.extend) return undefined;
+  return { count: EXTEND_MAX_SEGMENTS, color: mixColor(params.bg, params.stroke, params.extendIntensity), width: params.strokeWidth / 4 };
+}
+
 function draw() {
   updateCaption();
-  stage.render(path.points, Math.min(shown, segments()), params, viewport);
+  stage.render(path.points, Math.min(shown, segments()), params, viewport, extendStyle());
 }
 
 function fitView() {
   if (stage.width === 0) return;
-  viewport.fit(path, stage.width, stage.height);
+  // mobile : le dessin reste au-dessus de la feuille repliée et sous la légende (en haut à gauche)
+  if (isMobile()) viewport.fit(path, stage.width, stage.height, 20, { top: 48, bottom: 136 });
+  else viewport.fit(path, stage.width, stage.height);
 }
 
 // --- chiffres ------------------------------------------------------------
@@ -86,12 +96,14 @@ function rebuildPath(refit = true) {
   else draw();
 }
 
-/** Message d'état propre au texte et à l'image (troncature, réduction), vide sinon. */
+/** Message d'état propre au contenu (texte tronqué, image réduite, prolongements limités), vide sinon. */
 function contentStatus(): string {
   const t = strings(params.lang);
-  if (params.source === 'text' && textBytes(params.text) > TEXT_MAX_BYTES) return t.textTruncated.replace('{n}', TEXT_MAX_BYTES.toLocaleString(params.lang));
-  if (params.source === 'image' && image) return t.imageSize.replace('{w}', String(image.w)).replace('{h}', String(image.h));
-  return '';
+  const notes: string[] = [];
+  if (params.source === 'text' && textBytes(params.text) > TEXT_MAX_BYTES) notes.push(t.textTruncated.replace('{n}', TEXT_MAX_BYTES.toLocaleString(params.lang)));
+  if (params.source === 'image' && image) notes.push(t.imageSize.replace('{w}', String(image.w)).replace('{h}', String(image.h)));
+  if (params.extend && segments() > EXTEND_MAX_SEGMENTS) notes.push(t.extendLimited.replace('{n}', EXTEND_MAX_SEGMENTS.toLocaleString(params.lang)));
+  return notes.join(' · ');
 }
 
 async function reloadDigits() {
@@ -151,6 +163,7 @@ function update(patch: Partial<Params>) {
   } else {
     draw();
   }
+  if (before.extend !== params.extend) panel.setStatus(contentStatus());
 }
 
 // --- animation -----------------------------------------------------------
@@ -199,7 +212,34 @@ async function loadImage(file: File) {
 }
 
 // --- exports -------------------------------------------------------------
-const exportInput = (): ExportInput => ({ points: path.points, bounds: path, style: params, title: titleLines(), fileBase: makeFileBase(params, digits.length) });
+const exportInput = (): ExportInput => ({ points: path.points, bounds: path, style: params, extend: extendStyle(), title: titleLines(), fileBase: makeFileBase(params, digits.length) });
+let recorder: AbortController | null = null;
+
+/** Enregistre l'animation en vidéo (durée choisie, indépendante de la vitesse affichée) puis la télécharge. */
+async function exportVideo(duration: number) {
+  if (recorder) return;
+  const t = strings(params.lang);
+  const input = exportInput(); // instantané : modifier les réglages pendant l'enregistrement ne le perturbe pas
+  recorder = new AbortController();
+  panel.setRecording(true);
+  setStatus(t.recording.replace('{p}', '0'));
+  try {
+    const { blob, ext } = await recordVideo(input, {
+      duration,
+      signal: recorder.signal,
+      onProgress: (p) => panel.setStatus(t.recording.replace('{p}', String(Math.round(p * 100)))),
+    });
+    download(blob, `${input.fileBase}.${ext}`);
+    downloaded(ext === 'mp4' ? 'MP4' : 'WebM');
+  } catch (e) {
+    if ((e as Error).name === 'AbortError') flash(t.recordingCancelled);
+    else failed(e);
+  } finally {
+    recorder = null;
+    panel.setRecording(false);
+  }
+}
+
 const shareUrl = () => `${location.origin}${location.pathname}#${encodeParams(params)}`;
 
 const panel = createPanel(app, {
@@ -213,6 +253,9 @@ const panel = createPanel(app, {
   exportPng: (s) => void exportPng(exportInput(), s).then(() => downloaded('PNG'), failed),
   exportSvg: () => { try { exportSvg(exportInput()); downloaded('SVG'); } catch (e) { failed(e); } },
   exportPdf: () => void exportPdf(exportInput()).then(() => downloaded('PDF'), failed),
+  exportVideo: (d) => void exportVideo(d),
+  cancelVideo: () => recorder?.abort(),
+  canRecord: videoSupported,
   copyLink: async () => {
     history.replaceState(null, '', shareUrl());
     try {

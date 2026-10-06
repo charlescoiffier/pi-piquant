@@ -67,9 +67,6 @@ button.ghost { height: 18px; padding: 0 5px; border-color: transparent; backgrou
   position: absolute; left: 20px; bottom: 14px; pointer-events: none; user-select: none;
   font: 12px/1.2 Helvetica, Arial, sans-serif; color: #6b6b73; letter-spacing: .02em;
 }
-@media (max-width: 520px) {
-  .panel { right: 8px; top: 8px; }
-}
 button:disabled { opacity: .45; cursor: default; background: #fff; }
 .right { display: flex; justify-content: flex-end; margin-bottom: 4px; }
 .caption { white-space: pre-line; }
@@ -106,3 +103,37 @@ button.info {
 
 /* Curseur à crans pleine largeur sous un champ */
 .stops.full { flex: none; margin: -1px 0 6px; }
+.info-dialog .version { margin: 12px 0 0; font-size: 10.5px; color: var(--muted); }
+.info-dialog .version a { color: inherit; }
+
+/* Mobile : la fenêtre devient une feuille en bas de l'écran (seuil identique à MOBILE_QUERY dans src/ui/layout.ts) */
+@media (max-width: 640px) {
+  body { font-size: 13px; }
+  .panel {
+    top: auto; right: 0; left: 0; bottom: 0; width: auto; max-height: 55vh; max-height: 55dvh;
+    border-radius: 14px 14px 0 0; border-bottom: 0; padding-bottom: env(safe-area-inset-bottom);
+    box-shadow: 0 -6px 24px rgba(0,0,0,.14);
+  }
+  .panel-head { position: relative; cursor: pointer; padding: 12px 8px 6px 14px; }
+  .panel-head::before { content: ''; position: absolute; top: 5px; left: 50%; width: 36px; height: 4px; margin-left: -18px; border-radius: 2px; background: #d0d0d6; }
+  .panel-head .title { font-size: 14px; }
+  .panel-body { padding: 0 14px 10px; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+  .panel.collapsed .panel-body { border-top: 0; padding-bottom: 8px; }
+  button { height: 34px; padding: 0 12px; }
+  button.ghost { height: 32px; min-width: 36px; font-size: 14px; }
+  input[type=number], select { height: 34px; font-size: 16px; }
+  textarea { font-size: 16px; }
+  input[type=color] { height: 34px; }
+  .num input[type=number] { width: 64px; }
+  .num input[type=range], .stops input[type=range] { height: 28px; }
+  .field { grid-template-columns: 100px 1fr; margin-bottom: 9px; gap: 8px; }
+  .field > span, .check { font-size: 12.5px; }
+  .check { margin-bottom: 9px; }
+  .hint, .status { font-size: 12px; }
+  h3 { font-size: 10.5px; }
+  button.info { width: 30px; height: 30px; font-size: 13px; }
+  .row { gap: 6px; margin-bottom: 8px; }
+  .quick { margin-top: 6px; margin-bottom: 0; }
+  .caption { top: 14px; bottom: auto; left: 14px; font-size: 11.5px; }
+  .info-dialog { font-size: 13.5px; }
+}

@@ -22,14 +22,15 @@ export class Viewport {
     el.style.touchAction = 'none';
   }
 
-  /** Cadre `b` dans une zone w×h avec une marge en pixels. */
-  fit(b: Bounds, w: number, h: number, margin = 48) {
+  /** Cadre `b` dans une zone w×h avec une marge en pixels, hors des bandes `top` et `bottom` réservées (feuille mobile…). */
+  fit(b: Bounds, w: number, h: number, margin = 48, inset: { top: number; bottom: number } = { top: 0, bottom: 0 }) {
     const bw = Math.max(b.maxX - b.minX, 1e-6);
     const bh = Math.max(b.maxY - b.minY, 1e-6);
-    this.scale = Math.min((w - 2 * margin) / bw, (h - 2 * margin) / bh);
+    const free = Math.max(1, h - inset.top - inset.bottom);
+    this.scale = Math.min((w - 2 * margin) / bw, (free - 2 * margin) / bh);
     if (!Number.isFinite(this.scale) || this.scale <= 0) this.scale = 1;
     this.tx = (w - bw * this.scale) / 2 - b.minX * this.scale;
-    this.ty = (h - bh * this.scale) / 2 - b.minY * this.scale;
+    this.ty = inset.top + (free - bh * this.scale) / 2 - b.minY * this.scale;
     this.onChange();
   }
 
