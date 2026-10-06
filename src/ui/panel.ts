@@ -1,5 +1,5 @@
 import { strings, type Dict } from './i18n';
-import { isMobile, MOBILE_QUERY } from './layout';
+import { isMobile, MOBILE_QUERY, nextSheet, type Sheet } from './layout';
 import { COUNT_STOPS, DEFAULT_VIDEO_DURATION, INTENSITY_STOPS, LENGTH_STOPS, MAX_COUNT, usesCount, MAX_SPEED, MIN_SPEED, SPEED_STOPS, VIDEO_DURATION_STOPS, WIDTH_STOPS, type Params } from './state';
 
 export interface PanelActions {
@@ -40,7 +40,8 @@ export function createPanel(host: El, a: PanelActions) {
   panel.addEventListener('wheel', (e) => e.stopPropagation());
 
   let t: Dict = strings(a.get().lang);
-  let collapsed = isMobile(); // sur téléphone, la feuille démarre repliée : le dessin reste visible
+  let collapsed = false; // bureau : fenêtre repliée ou non
+  let sheet: Sheet = 'closed'; // mobile : la feuille démarre fermée (poignée seule), le dessin reste entièrement visible
   let playing = false;
   let canShowAll = false;
   let showAllBtn: HTMLButtonElement | null = null;
@@ -51,15 +52,64 @@ export function createPanel(host: El, a: PanelActions) {
   let status = '';
   let statusEl: El | null = null;
 
-  // --- glisser la fenêtre -------------------------------------------------
+  // --- mobile : feuille à trois positions ---------------------------------
+  // safe-area du bas (barre d'accueil des téléphones), mesurée via un élément invisible
+  const probe = h('div', { style: 'position:fixed;visibility:hidden;pointer-events:none;padding-bottom:env(safe-area-inset-bottom)' });
+  panel.append(probe);
+  const safeBottom = () => parseFloat(getComputedStyle(probe).paddingBottom) || 0;
+
+  /** Décalage vertical (px) de la feuille pour chaque position : 0 = entièrement visible. */
+  function sheetOffsets() {
+    const height = panel.offsetHeight;
+    const grip = header.querySelector<HTMLElement>('.grip');
+    const foot = body.querySelector<HTMLElement>('.foot');
+    const safe = safeBottom();
+    const closedVisible = (grip?.offsetHeight ?? 30) + safe; // poignée seule
+    const halfVisible = foot ? foot.offsetTop + foot.offsetHeight + 8 + safe : closedVisible; // + titre, actions rapides, ligne d'état
+    return { closed: height - closedVisible, half: height - halfVisible, full: 0 };
+  }
+
+  /** Place la feuille sur sa position (avec animation) ; sans effet sur bureau. */
+  function applySheet() {
+    if (!isMobile()) {
+      panel.style.transform = '';
+      panel.style.transition = '';
+      body.style.overflowY = '';
+      delete panel.dataset.sheet;
+      return;
+    }
+    panel.style.transition = '';
+    panel.style.transform = `translateY(${sheetOffsets()[sheet]}px)`;
+    body.style.overflowY = sheet === 'full' ? 'auto' : 'hidden'; // le contenu ne défile que feuille ouverte
+    panel.dataset.sheet = sheet;
+    header.querySelector('.grip')?.setAttribute('aria-expanded', String(sheet !== 'closed'));
+  }
+  window.addEventListener('resize', applySheet); // la barre d'adresse des téléphones change la hauteur utile
+
+  // --- glisser la fenêtre (bureau) ou la feuille (mobile) -----------------
   let drag: { dx: number; dy: number } | null = null;
+  let gesture: { startY: number; t0: number; base: number } | null = null;
+  const capture = (e: PointerEvent) => {
+    try { header.setPointerCapture(e.pointerId); } catch { /* pointeur synthétique : pas de capture */ }
+  };
   header.addEventListener('pointerdown', (e) => {
-    if (isMobile() || (e.target as HTMLElement).closest('button')) return; // la feuille mobile n'est pas déplaçable
+    if ((e.target as HTMLElement).closest('button')) return;
+    if (isMobile()) {
+      gesture = { startY: e.clientY, t0: performance.now(), base: sheetOffsets()[sheet] };
+      panel.style.transition = 'none'; // la feuille suit le doigt sans retard
+      capture(e);
+      return;
+    }
     const r = panel.getBoundingClientRect();
     drag = { dx: e.clientX - r.left, dy: e.clientY - r.top };
-    header.setPointerCapture(e.pointerId);
+    capture(e);
   });
   header.addEventListener('pointermove', (e) => {
+    if (gesture) {
+      const y = Math.min(sheetOffsets().closed, Math.max(0, gesture.base + e.clientY - gesture.startY));
+      panel.style.transform = `translateY(${y}px)`;
+      return;
+    }
     if (!drag) return;
     const x = Math.min(Math.max(0, e.clientX - drag.dx), window.innerWidth - 60);
     const y = Math.min(Math.max(0, e.clientY - drag.dy), window.innerHeight - 40);
@@ -67,17 +117,25 @@ export function createPanel(host: El, a: PanelActions) {
     panel.style.top = `${y}px`;
     panel.style.right = 'auto';
   });
-  header.addEventListener('pointerup', () => (drag = null));
-  // feuille mobile : toucher l'en-tête (hors boutons) la replie ou la déplie
-  header.addEventListener('click', (e) => {
-    if (!isMobile() || (e.target as HTMLElement).closest('button')) return;
-    collapsed = !collapsed;
-    build();
+  header.addEventListener('pointerup', (e) => {
+    drag = null;
+    if (!gesture) return;
+    const g = gesture;
+    gesture = null;
+    // petit/grand glissement vers le haut ou le bas, ou simple toucher : voir nextSheet
+    sheet = nextSheet(sheet, e.clientY - g.startY, performance.now() - g.t0, panel.offsetHeight);
+    applySheet();
   });
-  // changement de disposition (rotation, redimensionnement) : position libre effacée, état adapté
+  header.addEventListener('pointercancel', () => {
+    drag = null;
+    gesture = null;
+    applySheet(); // geste interrompu : la feuille revient à sa position
+  });
+  // changement de disposition (rotation, redimensionnement) : position libre effacée, état remis à zéro
   window.matchMedia(MOBILE_QUERY).addEventListener('change', () => {
     panel.style.left = panel.style.top = panel.style.right = '';
-    collapsed = isMobile();
+    collapsed = false;
+    sheet = 'closed';
     build();
   });
 
@@ -199,26 +257,36 @@ export function createPanel(host: El, a: PanelActions) {
       a.set({ lang: p.lang === 'fr' ? 'en' : 'fr' });
       build();
     }, 'ghost');
-    const fold = button(collapsed ? '+' : '–', () => {
-      collapsed = !collapsed;
-      build();
-    }, 'ghost');
-    fold.title = collapsed ? t.show : t.hide;
-    header.append(title, h('span', { class: 'spacer' }), langBtn, fold);
-    panel.classList.toggle('collapsed', collapsed);
-    if (collapsed) {
-      // feuille mobile repliée : les trois actions principales et la ligne d'état
-      if (isMobile()) {
-        body.append(
-          h('div', { class: 'row quick' },
-            button(playing ? t.pause : t.play, () => a.togglePlay()),
-            button(t.copyLink, () => a.copyLink()),
-            button(t.png, () => a.exportPng(Number(pngSizeValue))),
-          ),
-          footer(),
-        );
-      }
-      return;
+    const mobile = isMobile();
+    if (mobile) {
+      // en-tête = poignée (seule visible feuille fermée) + titre et langue ; pas de bouton de repli : on glisse ou on touche la poignée
+      const grip = h('div', { class: 'grip', role: 'button', tabindex: '0', 'aria-label': t.settings });
+      grip.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        e.preventDefault();
+        sheet = nextSheet(sheet, 0, 0, panel.offsetHeight); // équivaut à un toucher
+        applySheet();
+      });
+      header.append(grip, h('div', { class: 'sheet-title' }, title, h('span', { class: 'spacer' }), langBtn));
+      panel.classList.remove('collapsed');
+      // feuille mi-ouverte : les trois actions principales et la ligne d'état, juste sous le titre
+      body.append(
+        h('div', { class: 'row quick' },
+          button(playing ? t.pause : t.play, () => a.togglePlay()),
+          button(t.copyLink, () => a.copyLink()),
+          button(t.png, () => a.exportPng(Number(pngSizeValue))),
+        ),
+        footer(),
+      );
+    } else {
+      const fold = button(collapsed ? '+' : '–', () => {
+        collapsed = !collapsed;
+        build();
+      }, 'ghost');
+      fold.title = collapsed ? t.show : t.hide;
+      header.append(title, h('span', { class: 'spacer' }), langBtn, fold);
+      panel.classList.toggle('collapsed', collapsed);
+      if (collapsed) return;
     }
 
     // Source
@@ -333,7 +401,11 @@ export function createPanel(host: El, a: PanelActions) {
       ),
     ));
 
-    body.append(footer());
+    if (!mobile) body.append(footer());
+    else {
+      applySheet();
+      requestAnimationFrame(applySheet); // mesures définitives une fois la mise en page terminée
+    }
   }
 
   /** Ligne du bas : messages d'état à gauche, bouton d'information à droite. */

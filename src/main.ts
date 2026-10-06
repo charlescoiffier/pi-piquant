@@ -76,8 +76,8 @@ function draw() {
 
 function fitView() {
   if (stage.width === 0) return;
-  // mobile : le dessin reste au-dessus de la feuille repliée et sous la légende (en haut à gauche)
-  if (isMobile()) viewport.fit(path, stage.width, stage.height, 20, { top: 48, bottom: 136 });
+  // mobile : le dessin reste au-dessus de la poignée de la feuille fermée et sous la légende (en haut à gauche)
+  if (isMobile()) viewport.fit(path, stage.width, stage.height, 20, { top: 48, bottom: 72 });
   else viewport.fit(path, stage.width, stage.height);
 }
 

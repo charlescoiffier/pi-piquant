@@ -60,9 +60,13 @@ L'écran est blanc, avec une petite fenêtre de réglages que l'on peut **dépla
 - **À l'ouverture**, le nombre de décimales (entre 10 et 200) et l'angle unitaire (entre 1° et 90°) sont tirés au
   hasard : chaque visite propose un dessin différent.
 - **Langue** : français ou anglais (bouton FR/EN en haut de la fenêtre).
-- **Sur téléphone**, la fenêtre devient une **feuille en bas de l'écran** : repliée, elle montre seulement trois actions
-  (Animer, Copier lien, PNG) pour laisser le dessin visible ; toucher son en-tête la déplie (environ la moitié de
-  l'écran). Les commandes sont agrandies pour le tactile, et le pincement zoome comme sur ordinateur.
+- **Sur téléphone**, la fenêtre devient une **feuille en bas de l'écran**, à trois positions :
+  **fermée** (seule la poignée est visible, aucun bouton : le dessin occupe tout l'écran), **mi-ouverte** (titre, langue,
+  trois actions rapides — Animer, Copier lien, PNG — et ligne d'état) et **ouverte** (tous les réglages, qui défilent).
+  Toucher la poignée l'ouvre à moitié, puis complètement. On peut aussi la faire glisser : un **petit** glissement
+  vers le haut l'ouvre d'un cran, un petit glissement vers le bas la ferme d'un cran (de mi-ouverte à fermée, d'ouverte à
+  mi-ouverte), un **grand** glissement vers le bas la ferme d'un coup. Les commandes sont agrandies pour le tactile, et
+  le pincement zoome comme sur ordinateur.
 - **Version** : le bouton « i » affiche aussi la version de l'application, le commit correspondant et la date de
   construction (pratique pour vérifier quelle version est en ligne).
 
@@ -204,10 +208,19 @@ bascule de `requestAnimationFrame` à un minuteur pour aller au bout (images plu
 ## Version mobile
 
 Sous 640 px de large (`MOBILE_QUERY` dans `src/ui/layout.ts`, repris par la media query de `src/style.css`), la fenêtre de
-réglages devient une feuille en bas de l'écran : repliée par défaut, avec une barre d'actions rapides (`panel.ts`) ; l'en-tête
-n'est plus déplaçable mais se touche pour replier ou déplier ; les champs ont 16 px (pas de zoom automatique sur iOS) et les
-cibles tactiles 34 px. `fitView` réserve une marge basse pour que le dessin reste au-dessus de la feuille repliée
-(`Viewport.fit` accepte des marges haute et basse).
+réglages devient une **feuille à trois positions** (`Sheet` : `closed`, `half`, `full`). Sa hauteur est fixe (86 % de l'écran,
+720 px au plus) et c'est une translation qui la déplace ; `panel.ts` mesure les décalages de chaque position
+(`sheetOffsets` : poignée seule, jusqu'à la ligne d'état, ou entièrement visible, en tenant compte de la zone sûre du
+bas des téléphones) puis la place (`applySheet`). L'en-tête mobile est une poignée (`.grip`) suivie du titre et de la
+langue ; le contenu ne défile que feuille ouverte.
+
+Pendant un glissement sur l'en-tête, la feuille suit le doigt ; au relâchement, `nextSheet` (fonction pure, testée, dans
+`src/ui/layout.ts`) choisit la position selon le geste. **Seule la distance compte**, pas la vitesse : toucher
+(< 6 px, < 500 ms) : fermée → mi-ouverte → ouverte → mi-ouverte ; glissement « petit » (≥ 28 px) : d'une position à la
+voisine ; glissement « grand » (≥ 30 % de la hauteur, 150 px au moins) : d'ouverte à fermée, ou de fermée à ouverte.
+La poignée est aussi utilisable au clavier (Entrée ou Espace, équivalent à un toucher, `aria-expanded`). Les champs ont
+16 px (pas de zoom automatique sur iOS) et les cibles tactiles 34 px. `fitView` réserve une marge basse pour que le dessin
+reste au-dessus de la poignée (`Viewport.fit` accepte des marges haute et basse).
 
 ## Version affichée
 
@@ -221,6 +234,8 @@ cibles tactiles 34 px. `fitView` réserve une marge basse pour que le dessin res
 avec `puppeteer-core` sur des liens à réglages fixes (captures reproductibles, bureau et mobile) et enregistre l'animation
 avec le vrai bouton « Vidéo », puis la convertit en GIF carré avec `ffmpeg` (palette optimisée, sous 3 Mo). Prérequis :
 Google Chrome (ou `CHROME_PATH`) et `ffmpeg`. Les images sont écrites dans `docs/images/` et versionnées.
+On peut ne régénérer qu'une série : `npm run capture:readme -- --only=mobile` (`bureau`, `prolongements`, `texte`, `mobile`
+ou `animation`). Les captures mobiles touchent la poignée une ou deux fois pour montrer la feuille mi-ouverte puis ouverte.
 
 ## Conversions réversibles (texte et image)
 

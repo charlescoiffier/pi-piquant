@@ -106,19 +106,28 @@ button.info {
 .info-dialog .version { margin: 12px 0 0; font-size: 10.5px; color: var(--muted); }
 .info-dialog .version a { color: inherit; }
 
-/* Mobile : la fenêtre devient une feuille en bas de l'écran (seuil identique à MOBILE_QUERY dans src/ui/layout.ts) */
+/*
+ * Mobile : la fenêtre devient une feuille en bas de l'écran, à trois positions (src/ui/layout.ts, nextSheet) :
+ * fermée (poignée seule), mi-ouverte (titre, actions rapides, état) et ouverte. Hauteur fixe, déplacée par translation
+ * (position réglée par src/ui/panel.ts). Seuil identique à MOBILE_QUERY.
+ */
 @media (max-width: 640px) {
   body { font-size: 13px; }
   .panel {
-    top: auto; right: 0; left: 0; bottom: 0; width: auto; max-height: 55vh; max-height: 55dvh;
+    top: auto; right: 0; left: 0; bottom: 0; width: auto;
+    height: min(86vh, 720px); height: min(86dvh, 720px); max-height: none;
     border-radius: 14px 14px 0 0; border-bottom: 0; padding-bottom: env(safe-area-inset-bottom);
     box-shadow: 0 -6px 24px rgba(0,0,0,.14);
+    transform: translateY(calc(100% - 34px)); /* avant la mesure : poignée seule */
+    transition: transform .26s cubic-bezier(.2, .8, .2, 1);
+    will-change: transform;
   }
-  .panel-head { position: relative; cursor: pointer; padding: 12px 8px 6px 14px; }
-  .panel-head::before { content: ''; position: absolute; top: 5px; left: 50%; width: 36px; height: 4px; margin-left: -18px; border-radius: 2px; background: #d0d0d6; }
+  .panel-head { display: block; padding: 0 8px; cursor: default; touch-action: none; }
+  .grip { height: 30px; display: flex; align-items: center; justify-content: center; cursor: grab; touch-action: none; outline-offset: -3px; }
+  .grip::before { content: ''; width: 42px; height: 5px; border-radius: 3px; background: #c4c4cc; }
+  .sheet-title { display: flex; align-items: center; padding: 0 2px 6px 6px; }
   .panel-head .title { font-size: 14px; }
-  .panel-body { padding: 0 14px 10px; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
-  .panel.collapsed .panel-body { border-top: 0; padding-bottom: 8px; }
+  .panel-body { flex: 1; min-height: 0; padding: 0 14px 10px; overflow-y: hidden; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
   button { height: 34px; padding: 0 12px; }
   button.ghost { height: 32px; min-width: 36px; font-size: 14px; }
   input[type=number], select { height: 34px; font-size: 16px; }
@@ -133,7 +142,9 @@ button.info {
   h3 { font-size: 10.5px; }
   button.info { width: 30px; height: 30px; font-size: 13px; }
   .row { gap: 6px; margin-bottom: 8px; }
-  .quick { margin-top: 6px; margin-bottom: 0; }
+  .quick { margin-top: 8px; margin-bottom: 0; }
+  .foot { margin-top: 6px; margin-bottom: 4px; }
+  section:first-of-type { margin-top: 6px; }
   .caption { top: 14px; bottom: auto; left: 14px; font-size: 11.5px; }
   .info-dialog { font-size: 13.5px; }
 }

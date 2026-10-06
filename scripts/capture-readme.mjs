@@ -1,7 +1,8 @@
 /**
  * Régénère les images du README dans docs/images/ : captures d'écran (bureau et mobile) et GIF de l'animation.
  *
- * Usage : npm run capture:readme
+ * Usage : npm run capture:readme              (tout régénérer)
+ *         npm run capture:readme -- --only=mobile   (une seule série : bureau, prolongements, texte, mobile, animation)
  * Prérequis : Google Chrome (ou CHROME_PATH=/chemin/vers/chrome) et ffmpeg dans le PATH.
  *
  * Le script construit l'application, la sert en local, pilote Chrome sur des liens à réglages fixes (les images sont
@@ -21,6 +22,8 @@ const PORT = 4173;
 const BASE = `http://localhost:${PORT}/`;
 const CHROME = process.env.CHROME_PATH ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const GIF_MAX_BYTES = 3_000_000;
+const ONLY = (process.argv.find((a) => a.startsWith('--only=')) ?? '').slice(7);
+const want = (serie) => !ONLY || ONLY === serie;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const kb = (f) => `${Math.round(statSync(f).size / 1024)} Ko`;
@@ -110,30 +113,43 @@ async function main() {
     browser = await puppeteer.launch({ executablePath: CHROME, headless: true, args: ['--lang=fr-FR'] });
 
     console.log('Captures :');
-    await shot(await open(browser, { width: 1280, height: 800 }, lien('decimales=250&angle=17&prolongements=non')), 'apercu-bureau.png');
-
-    const prolong = await open(browser, { width: 900, height: 900 }, lien('decimales=100&angle=10&prolongements=oui&intensite=30'));
-    await hidePanel(prolong);
-    await shot(prolong, 'prolongements.png');
-
-    const texte = await open(browser, { width: 900, height: 900 }, 'source=texte&segment=10&angle=24&sens=anti-horaire&trait=111111&fond=ffffff&epaisseur=0.5&prolongements=non');
-    await hidePanel(texte);
-    await shot(texte, 'texte.png');
-
-    const mobile = { width: 390, height: 844, deviceScaleFactor: 2 };
-    await shot(await open(browser, mobile, lien('decimales=400&angle=24&prolongements=non'), { mobile: true }), 'mobile.png');
-    const ouvert = await open(browser, mobile, lien('decimales=400&angle=24&prolongements=non'), { mobile: true });
-    await ouvert.evaluate(() => [...document.querySelectorAll('.panel-head button')].pop().click());
-    await sleep(400);
-    await shot(ouvert, 'mobile-reglages.png');
-
-    console.log('Animation :');
-    const video = await recordAnimation(browser, tmp);
-    const probe = execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_name,width,height:format=duration', '-of', 'default=nw=1', video]).toString().trim().replace(/\n/g, ' · ');
-    console.log(`  vidéo enregistrée : ${video.split('.').pop()} · ${probe}`);
-    const gif = join(OUT, 'animation.gif');
-    toGif(video, gif);
-    console.log(`  animation.gif (${kb(gif)})`);
+    if (want('bureau')) {
+      await shot(await open(browser, { width: 1280, height: 800 }, lien('decimales=250&angle=17&prolongements=non')), 'apercu-bureau.png');
+    }
+    if (want('prolongements')) {
+      const prolong = await open(browser, { width: 900, height: 900 }, lien('decimales=100&angle=10&prolongements=oui&intensite=30'));
+      await hidePanel(prolong);
+      await shot(prolong, 'prolongements.png');
+    }
+    if (want('texte')) {
+      const texte = await open(browser, { width: 900, height: 900 }, 'source=texte&segment=10&angle=24&sens=anti-horaire&trait=111111&fond=ffffff&epaisseur=0.5&prolongements=non');
+      await hidePanel(texte);
+      await shot(texte, 'texte.png');
+    }
+    if (want('mobile')) {
+      // feuille à trois positions : on touche la poignée une fois (mi-ouverte) puis une seconde fois (ouverte)
+      const mobile = { width: 390, height: 844, deviceScaleFactor: 2 };
+      const lienMobile = lien('decimales=400&angle=24&prolongements=non');
+      const miOuverte = await open(browser, mobile, lienMobile, { mobile: true });
+      await miOuverte.click('.grip');
+      await sleep(600);
+      await shot(miOuverte, 'mobile.png');
+      const ouverte = await open(browser, mobile, lienMobile, { mobile: true });
+      await ouverte.click('.grip');
+      await sleep(600);
+      await ouverte.click('.grip');
+      await sleep(600);
+      await shot(ouverte, 'mobile-reglages.png');
+    }
+    if (want('animation')) {
+      console.log('Animation :');
+      const video = await recordAnimation(browser, tmp);
+      const probe = execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_name,width,height:format=duration', '-of', 'default=nw=1', video]).toString().trim().replace(/\n/g, ' · ');
+      console.log(`  vidéo enregistrée : ${video.split('.').pop()} · ${probe}`);
+      const gif = join(OUT, 'animation.gif');
+      toGif(video, gif);
+      console.log(`  animation.gif (${kb(gif)})`);
+    }
   } finally {
     await browser?.close();
     server.kill();

@@ -11,6 +11,7 @@ import { decodeParams, DEFAULTS, encodeParams, mixColor, sanitize, usesCount, wi
 import { clipLine, extendedLines } from '../src/geometry/extend';
 import { BUILD, REPO_URL, versionLine, versionParts } from '../src/ui/version';
 import { pickVideoType } from '../src/render/video';
+import { nextSheet } from '../src/ui/layout';
 import { drawPath } from '../src/render/canvas';
 
 const str = (d: Uint8Array) => Array.from(d).join('');
@@ -436,5 +437,40 @@ describe('tracé progressif', () => {
     drawPath(ctx, pts, 2, style, 1, 0, 0, 100, 100);
     expect(calls.at(-1)).toEqual(['l', 10, 10]);
     expect(calls.length).toBe(3);
+  });
+});
+
+describe('feuille mobile : position après un geste sur la poignée', () => {
+  const H = 700;
+  it('toucher : fermée → mi-ouverte → ouverte → mi-ouverte', () => {
+    expect(nextSheet('closed', 0, 120, H)).toBe('half');
+    expect(nextSheet('half', 2, 120, H)).toBe('full');
+    expect(nextSheet('full', -3, 120, H)).toBe('half');
+  });
+  it('seule la distance compte, pas la vitesse du geste', () => {
+    expect(nextSheet('full', 60, 5, H)).toBe('half'); // petit mouvement, même instantané
+    expect(nextSheet('full', 60, 2000, H)).toBe('half');
+    expect(nextSheet('half', -60, 5, H)).toBe('full');
+  });
+  it('un appui long sans mouvement n\'est pas un toucher : la feuille ne bouge pas', () => {
+    expect(nextSheet('closed', 0, 900, H)).toBe('closed');
+    expect(nextSheet('half', 0, 900, H)).toBe('half');
+  });
+  it('fermée : petit glissement vers le haut → mi-ouverte, grand → ouverte', () => {
+    expect(nextSheet('closed', -60, 400, H)).toBe('half');
+    expect(nextSheet('closed', -320, 400, H)).toBe('full');
+    expect(nextSheet('closed', -15, 400, H)).toBe('closed'); // trop court
+  });
+  it('mi-ouverte : petit glissement vers le haut → ouverte, vers le bas → fermée', () => {
+    expect(nextSheet('half', -40, 300, H)).toBe('full');
+    expect(nextSheet('half', 40, 300, H)).toBe('closed');
+    expect(nextSheet('half', -15, 300, H)).toBe('half');
+    expect(nextSheet('half', 15, 300, H)).toBe('half');
+  });
+  it('ouverte : petit glissement vers le bas → mi-ouverte, grand → fermée', () => {
+    expect(nextSheet('full', 60, 400, H)).toBe('half');
+    expect(nextSheet('full', 320, 600, H)).toBe('closed');
+    expect(nextSheet('full', 15, 400, H)).toBe('full');
+    expect(nextSheet('full', -80, 300, H)).toBe('full'); // vers le haut : reste ouverte
   });
 });
