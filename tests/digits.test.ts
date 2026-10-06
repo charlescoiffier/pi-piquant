@@ -382,9 +382,9 @@ describe('version affichée', () => {
     expect(versionLine('fr', b)).toBe('Version 0.2.0 · commit 017e7dd · 6 oct. 2026 · Code source');
     expect(versionLine('en', b)).toBe('Version 0.2.0 · commit 017e7dd · 6 Oct 2026 · Source code');
   });
-  it('le commit et le code source sont des liens vers GitLab', () => {
+  it('le commit et le code source sont des liens vers GitHub', () => {
     const parts = versionParts('fr', b);
-    expect(parts[1].href).toBe(`${REPO_URL}/-/commit/017e7dd`);
+    expect(parts[1].href).toBe(`${REPO_URL}/commit/017e7dd`);
     expect(parts[3].href).toBe(REPO_URL);
     expect(parts[0].href).toBeUndefined();
   });

@@ -1,11 +1,11 @@
 # π-piquant
 
-[![pipeline](https://gitlab.com/charlescoiffier/pi-piquant/badges/main/pipeline.svg)](https://gitlab.com/charlescoiffier/pi-piquant/-/pipelines)
+[![CI](https://github.com/charlescoiffier/pi-piquant/actions/workflows/ci.yml/badge.svg)](https://github.com/charlescoiffier/pi-piquant/actions/workflows/ci.yml)
 
 Une application web qui transforme une suite de chiffres (les décimales de π par défaut) en un dessin de
 lignes brisées, d'après la série « pi-piquant » de François Morellet.
 
-**Essayer l'application : https://pi-piquant-b69e0d.gitlab.io/**
+**Essayer l'application : https://charlescoiffier.github.io/pi-piquant/**
 
 Aucune installation : tout se passe dans le navigateur, et rien n'est envoyé à un serveur.
 
@@ -296,12 +296,12 @@ et `versionFromGit` (`scripts/version.ts`, fonction pure testée) en tire le num
 |---|---|
 | Sur le commit taggé `v0.3.0` | `0.3.0` |
 | 4 commits après ce tag | `0.3.0+4` |
-| Pipeline d'un tag (`CI_COMMIT_TAG`) | le tag |
+| Run de CI d'un tag (`CI_COMMIT_TAG` ou `GITHUB_REF_NAME`) | le tag |
 | Aucun tag, ou git indisponible | le champ `version` de `package.json` (secours) |
 
-Le commit (`__APP_COMMIT__`) vient de `CI_COMMIT_SHORT_SHA` dans le pipeline, sinon de `git rev-parse` ; le serveur de
-développement affiche « développement ». La date (`__APP_DATE__`) est celle de la construction. Pour que `git describe`
-fonctionne dans le pipeline, les jobs installent git et récupèrent tout l'historique, tags compris (`GIT_DEPTH: "0"`).
+Le commit (`__APP_COMMIT__`) vient de `CI_COMMIT_SHORT_SHA` si cette variable est définie, sinon de `git rev-parse` ; le
+serveur de développement affiche « développement ». La date (`__APP_DATE__`) est celle de la construction. Pour que
+`git describe` fonctionne dans la CI, le workflow récupère tout l'historique, tags compris (`fetch-depth: 0`).
 `src/ui/version.ts` formate la ligne de la modale.
 
 ### Publier une version
@@ -309,12 +309,12 @@ fonctionne dans le pipeline, les jobs installent git et récupèrent tout l'hist
 ```bash
 npm version minor        # ou patch / major : met à jour package.json et package-lock.json,
                          # crée le commit « 0.4.0 » et le tag annoté v0.4.0
-git push --follow-tags   # pousse le commit et le tag ; le pipeline reconstruit le site avec ce numéro
+git push --follow-tags   # pousse le commit et le tag ; le workflow reconstruit le site avec ce numéro
 ```
 
 Le tag est la référence ; `package.json` est tenu à jour par `npm version` pour rester cohérent (le dépôt doit être propre
 avant la commande). Les commits suivants, jusqu'au tag suivant, s'affichent `0.4.0+N`. Les tags sont visibles dans
-**Code → Tags** sur GitLab.
+l'onglet **Tags** de GitHub (https://github.com/charlescoiffier/pi-piquant/tags).
 
 ## Images du README
 
@@ -384,14 +384,16 @@ l'utilisateur ; à l'ouverture, la langue suit celle du navigateur. Le code d'en
 
 ## Publication
 
-Chaque push sur la branche par défaut déclenche le pipeline `.gitlab-ci.yml` : installation (`npm ci`), tests, build, puis
-déploiement sur GitLab Pages (image `node:22-alpine`, dossier `public/`).
+Le workflow `.github/workflows/ci.yml` (**GitHub Actions**) s'exécute à chaque push et chaque pull request : installation
+(`npm ci`), tests, build. Sur un push vers `main`, un second job publie le résultat sur **GitHub Pages**
+(https://charlescoiffier.github.io/pi-piquant/).
 
-- Sur les **autres branches**, le job `review` lance les tests, construit l'application et la publie comme artefact du
-  pipeline : le bouton « Voir l'application » de la merge request (ou **Operate → Environments**) l'ouvre, sans toucher à
-  la production. Les artefacts expirent au bout d'une semaine.
+- Sur les **autres branches** et les pull requests, le dossier construit est conservé une semaine comme **artefact du
+  run** (onglet **Actions** → le run → *Artifacts*) : on peut l'essayer sans toucher à la production.
 - `vite.config.ts` utilise `base: './'` (chemins relatifs), car le site est servi dans un sous-dossier.
-- GitLab Pages envoie `cache-control: max-age=600` : après un déploiement, un navigateur peut garder l'ancienne version
-  jusqu'à 10 minutes ; un rechargement forcé (Cmd/Ctrl + Maj + R) affiche la nouvelle.
-- L'adresse publique du site apparaît dans **Deploy → Pages** sur GitLab ; le badge en tête de ce fichier reflète l'état
-  du dernier pipeline.
+- GitHub Pages envoie `cache-control: max-age=600` : après un déploiement, un navigateur peut garder l'ancienne version
+  jusqu'à 10 minutes ; un rechargement forcé (Cmd/Ctrl + Maj + R) affiche la nouvelle. Les anciens fichiers JS ne sont
+  plus servis après un déploiement : une page d'accueil encore en cache peut alors s'afficher cassée jusqu'à son expiration.
+- La source de GitHub Pages est réglée sur **GitHub Actions** (Settings → Pages) ; le badge en tête de ce fichier reflète
+  l'état du dernier run du workflow.
+- Le projet a d'abord été hébergé sur GitLab ; l'historique (branches, tags) a été repris tel quel.

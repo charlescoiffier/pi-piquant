@@ -1,7 +1,7 @@
 import { strings } from './i18n';
 import type { Lang } from './state';
 
-export const REPO_URL = 'https://gitlab.com/charlescoiffier/pi-piquant';
+export const REPO_URL = 'https://github.com/charlescoiffier/pi-piquant';
 
 export interface BuildInfo {
   version: string;
@@ -27,7 +27,7 @@ export function versionParts(lang: Lang, b: BuildInfo): VersionPart[] {
   const date = new Date(b.date).toLocaleDateString(lang === 'fr' ? 'fr-FR' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
   return [
     { text: `${t.version} ${b.version}` },
-    b.commit === 'dev' ? { text: t.dev } : { text: `${t.commit} ${b.commit}`, href: `${REPO_URL}/-/commit/${b.commit}` },
+    b.commit === 'dev' ? { text: t.dev } : { text: `${t.commit} ${b.commit}`, href: `${REPO_URL}/commit/${b.commit}` },
     { text: date },
     { text: t.source, href: REPO_URL },
   ];

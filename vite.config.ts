@@ -14,12 +14,13 @@ const git = (...args: string[]): string | null => {
 };
 
 /** Numéro de version : dernier tag Git « vX.Y.Z » (package.json en secours). Voir scripts/version.ts. */
-const version = versionFromGit(git('describe', '--tags', '--long', '--match', 'v[0-9]*'), process.env.CI_COMMIT_TAG, pkg.version);
+const ciTag = process.env.CI_COMMIT_TAG ?? (process.env.GITHUB_REF_TYPE === 'tag' ? process.env.GITHUB_REF_NAME : undefined);
+const version = versionFromGit(git('describe', '--tags', '--long', '--match', 'v[0-9]*'), ciTag, pkg.version);
 
-/** Commit court : variable du pipeline GitLab, sinon git, sinon « dev ». */
+/** Commit court : variable CI_COMMIT_SHORT_SHA si elle est définie, sinon git, sinon « dev ». */
 const commit = () => process.env.CI_COMMIT_SHORT_SHA || git('rev-parse', '--short', 'HEAD') || 'dev';
 
-// Chemins relatifs : l'application est servie dans un sous-dossier (GitLab Pages : /pi-piquant/)
+// Chemins relatifs : l'application est servie dans un sous-dossier (GitHub Pages : /pi-piquant/)
 export default defineConfig(({ command }) => ({
   base: './',
   define: {
