@@ -1,5 +1,10 @@
-# Publie l'application sur GitLab Pages à chaque push sur la branche par défaut.
-# URL : voir Deploy > Pages (domaine unique du type https://pi-piquant-xxxxxx.gitlab.io/)
+# Deux jobs :
+#  - pages  : publie l'application sur GitLab Pages à chaque push sur la branche par défaut (production).
+#             URL : voir Deploy > Pages (domaine unique du type https://pi-piquant-xxxxxx.gitlab.io/)
+#  - review : sur les autres branches, lance les tests, construit l'application et la rend consultable
+#             sans toucher à la production (bouton « Voir l'application » sur la merge request et dans
+#             Operate > Environments). Les artefacts expirent au bout d'une semaine.
+
 pages:
   image: node:22-alpine
   stage: deploy
@@ -14,3 +19,22 @@ pages:
       - public
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+review:
+  image: node:22-alpine
+  stage: test
+  script:
+    - npm ci
+    - npm test
+    - npm run build
+    - mv dist public
+  artifacts:
+    paths:
+      - public
+    expire_in: 1 week
+  environment:
+    name: review/$CI_COMMIT_REF_SLUG
+    # l'application est servie depuis les artefacts du job (projet public) ; les chemins relatifs de Vite le permettent
+    url: https://$CI_PROJECT_NAMESPACE.$CI_PAGES_DOMAIN/-/$CI_PROJECT_NAME/-/jobs/$CI_JOB_ID/artifacts/public/index.html
+  rules:
+    - if: $CI_COMMIT_BRANCH && $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH

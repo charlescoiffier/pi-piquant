@@ -284,6 +284,9 @@ l'utilisateur ; à l'ouverture, la langue suit celle du navigateur. Le code d'en
 Chaque push sur la branche par défaut déclenche le pipeline `.gitlab-ci.yml` : installation (`npm ci`), tests, build, puis
 déploiement sur GitLab Pages (image `node:22-alpine`, dossier `public/`).
 
+- Sur les **autres branches**, le job `review` lance les tests, construit l'application et la publie comme artefact du
+  pipeline : le bouton « Voir l'application » de la merge request (ou **Operate → Environments**) l'ouvre, sans toucher à
+  la production. Les artefacts expirent au bout d'une semaine.
 - `vite.config.ts` utilise `base: './'` (chemins relatifs), car le site est servi dans un sous-dossier.
 - GitLab Pages envoie `cache-control: max-age=600` : après un déploiement, un navigateur peut garder l'ancienne version
   jusqu'à 10 minutes ; un rechargement forcé (Cmd/Ctrl + Maj + R) affiche la nouvelle.
