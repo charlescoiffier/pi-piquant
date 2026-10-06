@@ -1,6 +1,6 @@
 import { strings, type Dict } from './i18n';
 import { isMobile, MOBILE_QUERY, nextSheet, type Sheet } from './layout';
-import { COUNT_STOPS, DEFAULT_VIDEO_DURATION, INTENSITY_STOPS, LENGTH_STOPS, MAX_COUNT, usesCount, MAX_SPEED, MIN_SPEED, SPEED_STOPS, VIDEO_DURATION_STOPS, WIDTH_STOPS, type Params } from './state';
+import { COUNT_STOPS, DEFAULT_VIDEO_DURATION, INTENSITY_STOPS, darkPatch, isDark, LENGTH_STOPS, MAX_COUNT, usesCount, MAX_SPEED, MIN_SPEED, SPEED_STOPS, VIDEO_DURATION_STOPS, WIDTH_STOPS, type Params } from './state';
 
 export interface PanelActions {
   get(): Params;
@@ -38,6 +38,17 @@ export function createPanel(host: El, a: PanelActions) {
   panel.append(header, body);
   host.append(panel);
   panel.addEventListener('wheel', (e) => e.stopPropagation());
+  // Un bouton ou un curseur cliqué garderait le focus et « avalerait » les raccourcis (Espace, flèches) : on le rend.
+  panel.addEventListener('click', (e) => {
+    if ((e as MouseEvent).detail > 0) (e.target as Element).closest('button')?.blur(); // clic souris ou toucher, pas le clavier
+  });
+  panel.addEventListener('pointerup', (e) => (e.target as Element).closest<HTMLElement>('input[type=range]')?.blur());
+  // Échap quitte un champ de saisie (Entrée aussi pour un champ numérique) : les raccourcis redeviennent actifs
+  panel.addEventListener('keydown', (e) => {
+    const field = (e.target as Element).closest<HTMLElement>('input,textarea,select');
+    if (!field) return;
+    if (e.key === 'Escape' || (e.key === 'Enter' && field.matches('input[type=number]'))) field.blur();
+  });
 
   let t: Dict = strings(a.get().lang);
   let collapsed = false; // bureau : fenêtre repliée ou non
@@ -248,7 +259,14 @@ export function createPanel(host: El, a: PanelActions) {
   };
 
   // --- construction ------------------------------------------------------
+  /** Reconstruit la fenêtre en conservant la position de défilement (changement de langue, raccourci, animation…). */
   function build() {
+    const top = body.scrollTop;
+    render();
+    body.scrollTop = top;
+  }
+
+  function render() {
     const p = a.get();
     t = strings(p.lang);
     header.replaceChildren();
@@ -262,13 +280,7 @@ export function createPanel(host: El, a: PanelActions) {
     const mobile = isMobile();
     if (mobile) {
       // en-tête = poignée (seule visible feuille fermée) + titre et langue ; pas de bouton de repli : on glisse ou on touche la poignée
-      const grip = h('div', { class: 'grip', role: 'button', tabindex: '0', 'aria-label': t.settings });
-      grip.addEventListener('keydown', (e) => {
-        if (e.key !== 'Enter' && e.key !== ' ') return;
-        e.preventDefault();
-        sheet = nextSheet(sheet, 0, 0, panel.offsetHeight); // équivaut à un toucher
-        applySheet();
-      });
+      const grip = h('div', { class: 'grip', role: 'button', 'aria-label': t.settings });
       header.append(grip, h('div', { class: 'sheet-title' }, title, h('span', { class: 'spacer' }), langBtn));
       panel.classList.remove('collapsed');
     } else {
@@ -332,7 +344,7 @@ export function createPanel(host: El, a: PanelActions) {
     ex.checked = p.extend;
     ex.addEventListener('change', () => { a.set({ extend: ex.checked }); build(); });
     // Style
-    const dark = p.bg.toLowerCase() === '#111111';
+    const dark = isDark(p);
     body.append(section(t.section.style,
       h('div', { class: 'row' },
         field(t.stroke, color(p.stroke, (v) => a.set({ stroke: v }))),
@@ -343,7 +355,7 @@ export function createPanel(host: El, a: PanelActions) {
       ...(p.extend ? [field(t.extendIntensity, notched(p.extendIntensity, { min: 5, max: 100, step: 1, stops: INTENSITY_STOPS }, (v) => a.set({ extendIntensity: v })))] : []),
       field(t.strokeWidth, notched(p.strokeWidth, { min: 0.1, max: 10, step: 0.1, stops: WIDTH_STOPS }, (v) => a.set({ strokeWidth: v }))),
       button(dark ? t.light : t.dark, () => {
-        a.set(dark ? { bg: '#ffffff', stroke: '#111111' } : { bg: '#111111', stroke: '#f2f2f2' });
+        a.set(darkPatch(p));
         build();
       }),
     ));
@@ -414,6 +426,8 @@ export function createPanel(host: El, a: PanelActions) {
 
   return {
     rebuild: build,
+    pngSize: () => Number(pngSizeValue),
+    videoDuration: () => videoDuration,
     setPlaying(v: boolean) {
       if (playing !== v) { playing = v; build(); }
     },

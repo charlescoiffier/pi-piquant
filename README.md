@@ -69,18 +69,40 @@ L'écran est blanc, avec une petite fenêtre de réglages que l'on peut **dépla
   glissement vers le bas la ferme d'un cran (d'ouverte à mi-ouverte, de mi-ouverte à fermée), un **grand** glissement
   vers le bas la ferme d'un coup. Les commandes sont agrandies pour le tactile, et le pincement zoome comme sur ordinateur.
 - **Informations** : le bouton « i » ouvre une fenêtre à **deux onglets** : « François Morellet » (l'artiste, la série
-  pi-piquant, un lien vers son site) et « L'application » (le principe repris, la liste des raccourcis clavier, la version
-  de l'application avec le commit correspondant et la date de construction, pratique pour vérifier quelle version est en ligne).
+  pi-piquant, le principe repris par l'application, un lien vers son site) et « L'application » (la liste des raccourcis
+  clavier et la version de l'application, avec le commit correspondant et la date de construction, pratique pour vérifier
+  quelle version est en ligne).
 
 ### Raccourcis clavier
 
-| Touches | Effet |
-|---|---|
-| `H` | Masquer ou afficher la fenêtre de réglages (hors champs de saisie). |
-| `Cmd` / `Ctrl` + `V` | Coller un lien de partage dans la page pour en appliquer les réglages (hors champs de saisie). |
-| `Échap` | Fermer la fenêtre d'informations. |
-| `←` / `→` | Changer d'onglet dans la fenêtre d'informations (`Début` et `Fin` : premier et dernier onglet). |
-| `Entrée` / `Espace` | Sur téléphone, ouvrir ou refermer d'un cran la feuille de réglages quand sa poignée est sélectionnée. |
+La liste est aussi dans la fenêtre d'informations (touche `?`, onglet « L'application »). Les raccourcis ne s'appliquent
+pas pendant la saisie dans un champ (`Échap` ou `Entrée` pour en sortir) ni quand la fenêtre d'informations est ouverte.
+Chaque réglage fait au clavier est rappelé dans la barre du bas (« Nb de décimales : 101 »).
+
+| Groupe | Touches | Effet |
+|---|---|---|
+| Tracé | `↑` / `↓` | Ajouter ou retirer une décimale (`Maj` : par 10) ; pour π, e, φ et √2. |
+| | `←` / `→` | Diminuer ou augmenter l'angle unitaire de 1° (`Maj` : de 10°). |
+| | `Cmd` / `Ctrl` + `Opt` / `Alt` + `↑` / `↓` | Longueur du segment : cran suivant ou précédent. |
+| | `Cmd` / `Ctrl` + `Opt` / `Alt` + `←` / `→` | Épaisseur du trait : cran précédent ou suivant. |
+| | `1` / `2` / `3` / `4` | Choisir la source : π, e, φ ou √2 (sans `Maj` sur un clavier AZERTY, pavé numérique compris). |
+| Animation et vue | `Espace` | Lancer ou mettre en pause l'animation. |
+| | `Début` / `Fin` | Recommencer au premier segment / afficher tout le tracé. |
+| | `<` / `>` | Vitesse d'animation : cran précédent ou suivant. |
+| | `+` / `−` | Zoomer ou dézoomer. |
+| | `0` | Ajuster : recadrer tout le dessin. |
+| Style | `S` | Inverser le sens du premier angle. |
+| | `D` | Basculer en mode sombre. |
+| | `P` | Activer ou désactiver les prolongements. |
+| | `T` | Afficher ou masquer le titre. |
+| Actions | `L` | Copier le lien de partage. |
+| | `E` / `Maj` + `E` | Exporter en PNG / en SVG. |
+| | `V` | Enregistrer la vidéo (`Échap` l'annule). |
+| | `Cmd` / `Ctrl` + `V` | Coller un lien de partage dans la page pour en appliquer les réglages. |
+| Fenêtres | `H` | Masquer ou afficher la fenêtre de réglages. |
+| | `?` | Ouvrir la fenêtre d'informations. |
+| | `Échap` | Fermer la fenêtre d'informations, annuler l'enregistrement vidéo, ou quitter un champ de saisie. |
+| | `←` / `→` | Changer d'onglet dans la fenêtre d'informations (`Début` / `Fin` : premier et dernier onglet). |
 
 ### Ce que l'on peut dessiner (« Source »)
 
@@ -231,7 +253,7 @@ Pendant un glissement sur l'en-tête, la feuille suit le doigt ; au relâchement
 `src/ui/layout.ts`) choisit la position selon le geste. **Seule la distance compte**, pas la vitesse : toucher
 (< 6 px, < 500 ms) : fermée → mi-ouverte → ouverte → mi-ouverte ; glissement « petit » (≥ 28 px) : d'une position à la
 voisine ; glissement « grand » (≥ 30 % de la hauteur, 150 px au moins) : d'ouverte à fermée, ou de fermée à ouverte.
-La poignée est aussi utilisable au clavier (Entrée ou Espace, équivalent à un toucher, `aria-expanded`). Les champs ont
+La poignée porte `role="button"` et `aria-expanded` pour les lecteurs d'écran, mais n'a pas de raccourci clavier (la feuille est conçue pour le tactile). Les champs ont
 16 px (pas de zoom automatique sur iOS) et les cibles tactiles 34 px. `fitView` réserve une marge basse pour que le dessin
 reste au-dessus de la poignée (`Viewport.fit` accepte des marges haute et basse).
 
@@ -241,9 +263,29 @@ reste au-dessus de la poignée (`Viewport.fit` accepte des marges haute et basse
 flèches gauche et droite, `Début` et `Fin`, un seul onglet dans l'ordre de tabulation (tabindex itinérant). Les deux
 panneaux occupent la même cellule d'une grille (`visibility: hidden` pour l'inactif) : la fenêtre garde la hauteur du plus
 grand et ne saute pas d'un onglet à l'autre. Les textes sont dans `src/ui/i18n.ts` (`info`), dont la liste des
-raccourcis (`shortcuts`, une entrée par raccourci, les touches étant rendues en `<kbd>`) ; un test vérifie que les deux
-langues restent synchronisées. Le raccourci `H` est géré dans `src/main.ts` (ignoré avec `Ctrl`, `Cmd` ou `Alt`, dans les
-champs de saisie et pendant que la modale est ouverte).
+raccourcis (`shortcutGroups` : cinq groupes, une entrée par raccourci, les touches étant rendues en `<kbd>`) ; un test
+vérifie que les deux langues restent synchronisées. Les panneaux défilent seuls : les onglets et le bouton « Fermer »
+restent visibles.
+
+## Raccourcis clavier
+
+`shortcutFor` (`src/ui/shortcuts.ts`, fonction pure testée) traduit une touche en `ShortcutAction` ; `runShortcut`
+(`src/main.ts`) l'applique avec les mêmes fonctions que les boutons (`showAll`, `copyLink`, `exportPngAt`, `togglePlay`…).
+Règles :
+- la seule combinaison avec modificateurs est **`Cmd`/`Ctrl` + `Opt`/`Alt` + flèches** (longueur du segment, épaisseur) ;
+  `Cmd`/`Ctrl` seul ou `Alt` seul ne déclenchent jamais rien, pour ne masquer aucun raccourci du navigateur (`Cmd`+`L`,
+  `Cmd`+`R`, `Cmd`+`S`…) ;
+- les **chiffres** se lisent avec `event.code` (`Digit1`, `Numpad1`…) : ils fonctionnent sans `Maj` sur un clavier AZERTY ;
+  les signes (`+ − < > ?`) se lisent avec `event.key`, donc selon la disposition du clavier ;
+- `ignoresShortcut` laisse la touche à l'élément ciblé dans un champ de saisie, et `Espace` dans un bouton ou un lien
+  (qu'il active nativement) ; rien ne se déclenche modale ouverte ; seules les touches de réglage se répètent quand on
+  les maintient (les bascules ne s'exécutent qu'une fois) ;
+- les crans (`stepStop`) sont ceux des curseurs ; le mode sombre (`darkPatch`) est partagé avec le bouton de la fenêtre.
+
+Après un raccourci, la fenêtre est reconstruite pour afficher la nouvelle valeur (`panel.rebuild` conserve la position de
+défilement) et `flash` la rappelle dans la barre du bas ; un chargement de chiffres qui se termine n'efface pas ce message.
+Pour que les raccourcis restent utilisables après un usage de la souris, la fenêtre rend le focus aux boutons cliqués et aux
+curseurs relâchés, et `Échap` (ou `Entrée` pour un champ numérique) fait quitter un champ de saisie.
 
 ## Version affichée
 

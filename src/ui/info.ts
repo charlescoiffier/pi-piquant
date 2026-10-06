@@ -20,8 +20,8 @@ function keys(spec: string): Node[] {
 
 /**
  * Modale d'information à deux onglets :
- *  - « François Morellet » : l'artiste, la série pi-piquant, lien vers son site ;
- *  - « L'application » : le principe repris, les raccourcis clavier, la version.
+ *  - « François Morellet » : l'artiste, la série pi-piquant, le principe repris par l'application, lien vers son site ;
+ *  - « L'application » : les raccourcis clavier et la version.
  */
 export function createInfo(host: HTMLElement, getLang: () => Lang) {
   const overlay = el('div', { class: 'info-overlay', 'data-ui': '' });
@@ -41,7 +41,7 @@ export function createInfo(host: HTMLElement, getLang: () => Lang) {
     if (e.key === 'Escape' && !overlay.hidden) close();
   });
 
-  function open() {
+  function open(tab: 'morellet' | 'app' = 'morellet') {
     const t = strings(getLang()).info;
 
     // --- onglet 1 : François Morellet
@@ -49,18 +49,22 @@ export function createInfo(host: HTMLElement, getLang: () => Lang) {
       el('h2', {}, t.title),
       el('p', {}, t.p1),
       el('p', {}, t.p2),
+      el('p', {}, t.app), // le principe repris par l'application
       el('p', {}, link(SITE, `${t.link} →`)),
     ];
 
     // --- onglet 2 : l'application (principe, raccourcis clavier, version)
-    const shortcuts = el('dl', { class: 'shortcuts' });
-    for (const s of t.shortcuts) shortcuts.append(el('dt', {}, ...keys(s.keys)), el('dd', {}, s.text));
+    const shortcuts = t.shortcutGroups.flatMap((g) => {
+      const list = el('dl', { class: 'shortcuts' });
+      for (const s of g.items) list.append(el('dt', {}, ...keys(s.keys)), el('dd', {}, s.text));
+      return [el('h4', {}, g.title), list];
+    });
     const version = el('p', { class: 'version' });
     versionParts(getLang(), BUILD).forEach((part, i) => {
       if (i) version.append(' · ');
       version.append(part.href ? link(part.href, part.text) : part.text);
     });
-    const app = [el('h2', {}, t.appTitle), el('p', {}, t.app), el('h3', {}, t.shortcutsTitle), shortcuts, version];
+    const app = [el('h3', {}, t.shortcutsTitle), el('p', { class: 'hint' }, t.shortcutsNote), ...shortcuts, version];
 
     // --- onglets (ARIA : tablist / tab / tabpanel, flèches gauche-droite, Début, Fin)
     const defs = [
@@ -98,7 +102,7 @@ export function createInfo(host: HTMLElement, getLang: () => Lang) {
     );
     overlay.replaceChildren(dlg);
     overlay.hidden = false;
-    select(0, true);
+    select(tab === 'app' ? 1 : 0, true);
   }
 
   return { open, close };

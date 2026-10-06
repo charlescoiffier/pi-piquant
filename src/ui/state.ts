@@ -80,6 +80,11 @@ const invert = <T extends string>(m: Record<T, string>) =>
 const SOURCE_BY_NAME = invert(SOURCE_NAMES);
 const TRAVERSAL_BY_NAME = invert(TRAVERSAL_NAMES);
 
+/** Mode sombre : fond noir et trait clair (bouton de la fenêtre et raccourci D). */
+export const isDark = (p: Pick<Params, 'bg'>) => p.bg.toLowerCase() === '#111111';
+export const darkPatch = (p: Pick<Params, 'bg'>): Partial<Params> =>
+  isDark(p) ? { bg: '#ffffff', stroke: '#111111' } : { bg: '#111111', stroke: '#f2f2f2' };
+
 /** Mélange le trait et le fond : pct % de trait, le reste de fond (couleurs « #rrggbb »). */
 export function mixColor(bg: string, stroke: string, pct: number): string {
   const a = Math.min(100, Math.max(0, pct)) / 100;

@@ -7,12 +7,13 @@ import { decodeImage, fitImageSize, IMAGE_HEADER_DIGITS, IMAGE_MAX_PIXELS, image
 import { freeDigits } from '../src/digits/free';
 import { embeddedDigits } from '../src/digits/embedded';
 import { makeFileBase, makeSubtitle, makeTitle } from '../src/ui/title';
-import { decodeParams, DEFAULTS, encodeParams, mixColor, sanitize, usesCount, withPersonalSettings } from '../src/ui/state';
+import { darkPatch, decodeParams, DEFAULTS, encodeParams, isDark, mixColor, sanitize, usesCount, withPersonalSettings } from '../src/ui/state';
 import { clipLine, extendedLines } from '../src/geometry/extend';
 import { BUILD, REPO_URL, versionLine, versionParts } from '../src/ui/version';
 import { pickVideoType } from '../src/render/video';
 import { nextSheet } from '../src/ui/layout';
 import { strings } from '../src/ui/i18n';
+import { ignoresShortcut, shortcutFor, stepStop, ZOOM_STEP, type KeyInfo } from '../src/ui/shortcuts';
 import { drawPath } from '../src/render/canvas';
 
 const str = (d: Uint8Array) => Array.from(d).join('');
@@ -487,20 +488,126 @@ describe('modale d\'information : textes des deux onglets', () => {
       expect(t.tabMorellet).toBe('François Morellet');
       expect(t.p1.length).toBeGreaterThan(50);
       expect(t.p2).toContain('pi-piquant');
-      expect(t.app).toContain('François Morellet'); // le principe se lit sans le premier onglet
-      expect(t.app).toContain('pi-piquant');
+      expect(t.app.length).toBeGreaterThan(100); // le principe repris, affiché dans le premier onglet
     }
   });
-  it('mêmes raccourcis dans les deux langues (même structure de touches), chacun avec une explication', () => {
-    // les légendes diffèrent (Échap / Esc, Entrée / Enter) : on compare le nombre de touches et leurs séparateurs
+  type Raccourcis = { shortcutGroups: readonly { items: readonly { keys: string; text: string }[] }[] };
+  const flat = (t: Raccourcis) => t.shortcutGroups.flatMap((g) => g.items);
+  it('mêmes groupes et mêmes raccourcis dans les deux langues (même structure de touches), chacun avec une explication', () => {
+    // les légendes diffèrent (Échap / Esc, Espace / Space) : on compare le nombre de touches et leurs séparateurs
     const forme = (k: string) => k.split(/ [+/] /).length + (k.match(/ [+/] /g) ?? []).join('');
-    expect(en.shortcuts.map((x) => forme(x.keys))).toEqual(fr.shortcuts.map((x) => forme(x.keys)));
+    expect(en.shortcutGroups.map((g) => g.items.map((x) => forme(x.keys)))).toEqual(fr.shortcutGroups.map((g) => g.items.map((x) => forme(x.keys))));
     for (const t of [fr, en]) {
-      expect(t.shortcuts.length).toBeGreaterThanOrEqual(5);
-      for (const x of t.shortcuts) expect(x.text.length).toBeGreaterThan(10);
+      expect(t.shortcutGroups.length).toBe(5);
+      for (const x of flat(t)) expect(x.text.length).toBeGreaterThan(8);
     }
   });
-  it('raccourcis annoncés : H, collage d\'un lien, fermeture, changement d\'onglet, poignée mobile', () => {
-    expect(fr.shortcuts.map((x) => x.keys)).toEqual(['H', 'Cmd / Ctrl + V', 'Échap', '← / →', 'Entrée / Espace']);
+  it('tous les raccourcis annoncés sont dans la liste', () => {
+    const keys = flat(fr).map((x) => x.keys);
+    for (const attendu of ['↑ / ↓', '← / →', 'Cmd / Ctrl + Opt / Alt + ↑ / ↓', 'Cmd / Ctrl + Opt / Alt + ← / →', '1 / 2 / 3 / 4', 'Espace', 'Début / Fin', '< / >', '+ / −', '0', 'S', 'D', 'P', 'T', 'L', 'E', 'V', 'Cmd / Ctrl + V', 'H', '?', 'Échap'])
+      expect(keys).toContain(attendu);
+  });
+});
+
+describe('raccourcis clavier', () => {
+  const k = (key: string, o: Partial<KeyInfo> = {}): KeyInfo => ({ key, code: '', shiftKey: false, ctrlKey: false, metaKey: false, altKey: false, ...o });
+  const code = (c: string, key = '', o: Partial<KeyInfo> = {}) => k(key, { code: c, ...o });
+
+  it('flèches seules : décimales (↑ ↓) et angle unitaire (← →), Maj = par 10', () => {
+    expect(shortcutFor(k('ArrowUp'))).toEqual({ type: 'count', delta: 1 });
+    expect(shortcutFor(k('ArrowDown'))).toEqual({ type: 'count', delta: -1 });
+    expect(shortcutFor(k('ArrowUp', { shiftKey: true }))).toEqual({ type: 'count', delta: 10 });
+    expect(shortcutFor(k('ArrowDown', { shiftKey: true }))).toEqual({ type: 'count', delta: -10 });
+    expect(shortcutFor(k('ArrowRight'))).toEqual({ type: 'angle', delta: 1 });
+    expect(shortcutFor(k('ArrowLeft', { shiftKey: true }))).toEqual({ type: 'angle', delta: -10 });
+  });
+  it('Cmd ou Ctrl + Opt ou Alt + flèches : longueur du segment (↑ ↓) et épaisseur du trait (← →)', () => {
+    for (const mod of [{ metaKey: true, altKey: true }, { ctrlKey: true, altKey: true }]) {
+      expect(shortcutFor(k('ArrowUp', mod))).toEqual({ type: 'length', dir: 1 });
+      expect(shortcutFor(k('ArrowDown', mod))).toEqual({ type: 'length', dir: -1 });
+      expect(shortcutFor(k('ArrowRight', mod))).toEqual({ type: 'width', dir: 1 });
+      expect(shortcutFor(k('ArrowLeft', mod))).toEqual({ type: 'width', dir: -1 });
+    }
+  });
+  it('animation et vue : Espace, Début, Fin, < >, + −, 0', () => {
+    expect(shortcutFor(k(' '))).toEqual({ type: 'play' });
+    expect(shortcutFor(k('Home'))).toEqual({ type: 'restart' });
+    expect(shortcutFor(k('End'))).toEqual({ type: 'showAll' });
+    expect(shortcutFor(k('<'))).toEqual({ type: 'speed', dir: -1 });
+    expect(shortcutFor(k('>'))).toEqual({ type: 'speed', dir: 1 });
+    expect(shortcutFor(k('+'))).toEqual({ type: 'zoom', factor: ZOOM_STEP });
+    expect(shortcutFor(k('='))).toEqual({ type: 'zoom', factor: ZOOM_STEP }); // + sans Maj sur un clavier américain
+    expect(shortcutFor(k('-'))).toEqual({ type: 'zoom', factor: 1 / ZOOM_STEP });
+    expect(shortcutFor(code('Digit0', '0'))).toEqual({ type: 'fit' });
+  });
+  it('1 à 4 : source π, e, φ, √2 ; 5 à 9 ne font rien', () => {
+    expect(['1', '2', '3', '4'].map((n) => shortcutFor(code(`Digit${n}`, n)))).toEqual([
+      { type: 'source', source: 'pi' }, { type: 'source', source: 'e' }, { type: 'source', source: 'phi' }, { type: 'source', source: 'sqrt2' },
+    ]);
+    expect(shortcutFor(code('Numpad3', '3'))).toEqual({ type: 'source', source: 'phi' }); // pavé numérique
+    for (const n of ['5', '6', '7', '8', '9']) expect(shortcutFor(code(`Digit${n}`, n))).toBeNull();
+  });
+  it('AZERTY : les chiffres sont reconnus sans Maj (touche &, é, ", \') grâce à « code »', () => {
+    expect(shortcutFor(code('Digit1', '&'))).toEqual({ type: 'source', source: 'pi' });
+    expect(shortcutFor(code('Digit2', 'é'))).toEqual({ type: 'source', source: 'e' });
+    expect(shortcutFor(code('Digit0', 'à'))).toEqual({ type: 'fit' });
+  });
+  it('style : S sens, D sombre, P prolongements, T titre (majuscules acceptées)', () => {
+    expect(shortcutFor(k('s'))).toEqual({ type: 'flip' });
+    expect(shortcutFor(k('D'))).toEqual({ type: 'dark' });
+    expect(shortcutFor(k('p'))).toEqual({ type: 'extend' });
+    expect(shortcutFor(k('T', { shiftKey: true }))).toEqual({ type: 'title' });
+  });
+  it('actions : L lien, E PNG, Maj+E SVG, V vidéo ; fenêtres : H, ?, Échap', () => {
+    expect(shortcutFor(k('l'))).toEqual({ type: 'copyLink' });
+    expect(shortcutFor(k('e'))).toEqual({ type: 'png' });
+    expect(shortcutFor(k('E', { shiftKey: true }))).toEqual({ type: 'svg' });
+    expect(shortcutFor(k('v'))).toEqual({ type: 'video' });
+    expect(shortcutFor(k('h'))).toEqual({ type: 'hide' });
+    expect(shortcutFor(k('?', { shiftKey: true }))).toEqual({ type: 'info' });
+    expect(shortcutFor(k('Escape'))).toEqual({ type: 'escape' });
+  });
+  it('Cmd/Ctrl seul ou Alt seul ne déclenchent rien (Cmd+L, Cmd+R, Cmd+↑… restent au navigateur)', () => {
+    for (const key of ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'l', 'r', 'h', 's', 'e', 'v', 'd', 'p', 't', ' ', '+', '-', 'Home', 'End', '?'])
+      for (const mod of [{ metaKey: true }, { ctrlKey: true }, { altKey: true }]) expect(shortcutFor(k(key, mod))).toBeNull();
+    expect(shortcutFor(code('Digit1', '1', { metaKey: true }))).toBeNull();
+    expect(shortcutFor(code('Digit1', '1', { altKey: true }))).toBeNull();
+  });
+  it('Cmd/Ctrl + Opt/Alt : seulement les flèches, sans Maj', () => {
+    expect(shortcutFor(k('ArrowUp', { metaKey: true, altKey: true, shiftKey: true }))).toBeNull();
+    for (const key of ['l', 's', 'h', ' ', '+', 'Home', '?']) expect(shortcutFor(k(key, { metaKey: true, altKey: true }))).toBeNull();
+  });
+  it('touches sans raccourci', () => {
+    for (const key of ['a', 'z', 'x', 'Enter', 'Tab', 'F5', 'Shift', 'Control']) expect(shortcutFor(k(key))).toBeNull();
+  });
+
+  it('champs de saisie : les raccourcis sont laissés à l\'élément ; Espace aussi dans un bouton ou un lien', () => {
+    const el = (matches: string) => ({ closest: (sel: string) => (sel.split(',').some((s) => matches.split(',').includes(s.trim())) ? {} : null) }) as unknown as Element;
+    expect(ignoresShortcut(el('input'), 'ArrowUp')).toBe(true);
+    expect(ignoresShortcut(el('textarea'), 'h')).toBe(true);
+    expect(ignoresShortcut(el('select'), 'ArrowDown')).toBe(true);
+    expect(ignoresShortcut(el('button'), ' ')).toBe(true);
+    expect(ignoresShortcut(el('button'), 'h')).toBe(false); // une lettre ne fait rien sur un bouton
+    expect(ignoresShortcut(el('a'), ' ')).toBe(true);
+    expect(ignoresShortcut(el('div'), ' ')).toBe(false);
+    expect(ignoresShortcut(null, ' ')).toBe(false);
+    expect(ignoresShortcut({} as Element, 'h')).toBe(false); // cible sans closest (window)
+  });
+
+  it('stepStop : cran suivant ou précédent, depuis un cran ou une valeur intermédiaire, borné aux extrémités', () => {
+    const L = [1, 2, 5, 10, 20, 50, 100];
+    expect(stepStop(L, 10, 1)).toBe(20);
+    expect(stepStop(L, 10, -1)).toBe(5);
+    expect(stepStop(L, 30, 1)).toBe(50);
+    expect(stepStop(L, 30, -1)).toBe(20);
+    expect(stepStop(L, 100, 1)).toBe(100);
+    expect(stepStop(L, 1, -1)).toBe(1);
+    expect(stepStop([0.1, 0.2, 0.5, 1], 0.3, 1)).toBe(0.5);
+  });
+  it('mode sombre : bascule fond/trait, partagée par le bouton et le raccourci D', () => {
+    expect(isDark(DEFAULTS)).toBe(false);
+    expect(darkPatch(DEFAULTS)).toEqual({ bg: '#111111', stroke: '#f2f2f2' });
+    expect(isDark({ bg: '#111111' })).toBe(true);
+    expect(darkPatch({ bg: '#111111' })).toEqual({ bg: '#ffffff', stroke: '#111111' });
   });
 });
