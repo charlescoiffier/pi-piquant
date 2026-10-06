@@ -1,5 +1,6 @@
 import { strings, type Dict } from './i18n';
-import { COUNT_STOPS, LENGTH_STOPS, MAX_COUNT, usesCount, MAX_SPEED, MIN_SPEED, SPEED_STOPS, WIDTH_STOPS, type Params } from './state';
+import { isMobile, MOBILE_QUERY } from './layout';
+import { COUNT_STOPS, DEFAULT_VIDEO_DURATION, INTENSITY_STOPS, LENGTH_STOPS, MAX_COUNT, usesCount, MAX_SPEED, MIN_SPEED, SPEED_STOPS, VIDEO_DURATION_STOPS, WIDTH_STOPS, type Params } from './state';
 
 export interface PanelActions {
   get(): Params;
@@ -12,6 +13,9 @@ export interface PanelActions {
   exportPng(size: number): void;
   exportSvg(): void;
   exportPdf(): void;
+  exportVideo(duration: number): void;
+  cancelVideo(): void;
+  canRecord(): boolean;
   copyLink(): void;
   saveJson(): void;
   loadJson(file: File): void;
@@ -36,17 +40,21 @@ export function createPanel(host: El, a: PanelActions) {
   panel.addEventListener('wheel', (e) => e.stopPropagation());
 
   let t: Dict = strings(a.get().lang);
-  let collapsed = false;
+  let collapsed = isMobile(); // sur téléphone, la feuille démarre repliée : le dessin reste visible
   let playing = false;
   let canShowAll = false;
   let showAllBtn: HTMLButtonElement | null = null;
+  let recording = false;
+  // réglages d'export conservés quand le panneau est reconstruit
+  let pngSizeValue: '2048' | '4096' | '8192' = '4096';
+  let videoDuration = DEFAULT_VIDEO_DURATION;
   let status = '';
   let statusEl: El | null = null;
 
   // --- glisser la fenêtre -------------------------------------------------
   let drag: { dx: number; dy: number } | null = null;
   header.addEventListener('pointerdown', (e) => {
-    if ((e.target as HTMLElement).closest('button')) return;
+    if (isMobile() || (e.target as HTMLElement).closest('button')) return; // la feuille mobile n'est pas déplaçable
     const r = panel.getBoundingClientRect();
     drag = { dx: e.clientX - r.left, dy: e.clientY - r.top };
     header.setPointerCapture(e.pointerId);
@@ -60,6 +68,18 @@ export function createPanel(host: El, a: PanelActions) {
     panel.style.right = 'auto';
   });
   header.addEventListener('pointerup', () => (drag = null));
+  // feuille mobile : toucher l'en-tête (hors boutons) la replie ou la déplie
+  header.addEventListener('click', (e) => {
+    if (!isMobile() || (e.target as HTMLElement).closest('button')) return;
+    collapsed = !collapsed;
+    build();
+  });
+  // changement de disposition (rotation, redimensionnement) : position libre effacée, état adapté
+  window.matchMedia(MOBILE_QUERY).addEventListener('change', () => {
+    panel.style.left = panel.style.top = panel.style.right = '';
+    collapsed = isMobile();
+    build();
+  });
 
   // --- briques de formulaire ---------------------------------------------
   const field = (label: string, input: El) => h('label', { class: 'field' }, h('span', {}, label), input);
@@ -186,7 +206,20 @@ export function createPanel(host: El, a: PanelActions) {
     fold.title = collapsed ? t.show : t.hide;
     header.append(title, h('span', { class: 'spacer' }), langBtn, fold);
     panel.classList.toggle('collapsed', collapsed);
-    if (collapsed) return;
+    if (collapsed) {
+      // feuille mobile repliée : les trois actions principales et la ligne d'état
+      if (isMobile()) {
+        body.append(
+          h('div', { class: 'row quick' },
+            button(playing ? t.pause : t.play, () => a.togglePlay()),
+            button(t.copyLink, () => a.copyLink()),
+            button(t.png, () => a.exportPng(Number(pngSizeValue))),
+          ),
+          footer(),
+        );
+      }
+      return;
+    }
 
     // Source
     const src = select<Params['source']>(
@@ -234,6 +267,9 @@ export function createPanel(host: El, a: PanelActions) {
     const tt = h('input', { type: 'checkbox' }) as HTMLInputElement;
     tt.checked = p.showTitle;
     tt.addEventListener('change', () => a.set({ showTitle: tt.checked }));
+    const ex = h('input', { type: 'checkbox' }) as HTMLInputElement;
+    ex.checked = p.extend;
+    ex.addEventListener('change', () => { a.set({ extend: ex.checked }); build(); });
     // Style
     const dark = p.bg.toLowerCase() === '#111111';
     body.append(section(t.section.style,
@@ -242,6 +278,8 @@ export function createPanel(host: El, a: PanelActions) {
         field(t.bg, color(p.bg, (v) => a.set({ bg: v }))),
       ),
       h('label', { class: 'check' }, tt, h('span', {}, t.showTitle)),
+      h('label', { class: 'check' }, ex, h('span', {}, t.extend)),
+      ...(p.extend ? [field(t.extendIntensity, notched(p.extendIntensity, { min: 5, max: 100, step: 1, stops: INTENSITY_STOPS }, (v) => a.set({ extendIntensity: v })))] : []),
       field(t.strokeWidth, notched(p.strokeWidth, { min: 0.1, max: 10, step: 0.1, stops: WIDTH_STOPS }, (v) => a.set({ strokeWidth: v }))),
       button(dark ? t.light : t.dark, () => {
         a.set(dark ? { bg: '#ffffff', stroke: '#111111' } : { bg: '#111111', stroke: '#f2f2f2' });
@@ -273,7 +311,12 @@ export function createPanel(host: El, a: PanelActions) {
     ));
 
     // Export
-    const pngSize = select<'2048' | '4096' | '8192'>([['2048', '2048'], ['4096', '4096'], ['8192', '8192']], '4096', () => {});
+    const pngSize = select<'2048' | '4096' | '8192'>([['2048', '2048'], ['4096', '4096'], ['8192', '8192']], pngSizeValue, (v) => { pngSizeValue = v; });
+    const videoBtn = button(recording ? t.cancel : t.video, () => (recording ? a.cancelVideo() : a.exportVideo(videoDuration)));
+    if (!a.canRecord()) {
+      videoBtn.disabled = true;
+      videoBtn.title = t.videoUnsupported;
+    }
     body.append(section(t.exportTitle,
       field(t.pngSize, pngSize),
       h('div', { class: 'row' },
@@ -281,6 +324,8 @@ export function createPanel(host: El, a: PanelActions) {
         button(t.svg, () => a.exportSvg()),
         button(t.pdf, () => a.exportPdf()),
       ),
+      field(t.videoDuration, notched(videoDuration, { min: 3, max: 60, step: 1, stops: VIDEO_DURATION_STOPS }, (v) => { videoDuration = v; })),
+      h('div', { class: 'row' }, videoBtn),
       h('div', { class: 'row' },
         button(t.copyLink, () => a.copyLink()),
         button(t.saveJson, () => a.saveJson()),
@@ -288,11 +333,16 @@ export function createPanel(host: El, a: PanelActions) {
       ),
     ));
 
+    body.append(footer());
+  }
+
+  /** Ligne du bas : messages d'état à gauche, bouton d'information à droite. */
+  function footer() {
     statusEl = h('p', { class: 'status', role: 'status' }, status);
     const info = button('i', () => a.openInfo(), 'info');
     info.title = t.info.label;
     info.setAttribute('aria-label', t.info.label);
-    body.append(h('div', { class: 'foot' }, statusEl, info));
+    return h('div', { class: 'foot' }, statusEl, info);
   }
 
   build();
@@ -301,6 +351,9 @@ export function createPanel(host: El, a: PanelActions) {
     rebuild: build,
     setPlaying(v: boolean) {
       if (playing !== v) { playing = v; build(); }
+    },
+    setRecording(v: boolean) {
+      if (recording !== v) { recording = v; build(); }
     },
     setCanShowAll(v: boolean) {
       canShowAll = v;

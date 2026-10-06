@@ -9,6 +9,8 @@ export interface Params {
   coef: number; // degrés par unité de chiffre
   firstDir: 1 | -1; // sens du premier angle (1 = horaire à l'écran)
   strokeWidth: number;
+  extend: boolean; // prolongements des segments en fines droites
+  extendIntensity: number; // 5-100 % : mélange du trait avec le fond
   stroke: string;
   bg: string;
   freeDigits: string;
@@ -26,6 +28,8 @@ export const DEFAULTS: Params = {
   coef: 10,
   firstDir: -1, // comme dans l'œuvre : le 2e segment s'écarte du 1er vers la droite
   strokeWidth: 0.5,
+  extend: false,
+  extendIntensity: 30,
   stroke: '#111111',
   bg: '#ffffff',
   freeDigits: '1234567890',
@@ -50,6 +54,14 @@ export const SPEED_STOPS = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000
 /** Crans du nombre de décimales (1 à 100 000), en suite 1-2-5. */
 export const COUNT_STOPS = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000];
 
+/** Prolongements : nombre maximal de segments prolongés, et crans de l'intensité (en %). */
+export const EXTEND_MAX_SEGMENTS = 5000;
+export const INTENSITY_STOPS = [5, 10, 20, 30, 50, 70, 100];
+
+/** Export vidéo : durée du tracé en secondes (crans) et valeur par défaut. */
+export const VIDEO_DURATION_STOPS = [3, 5, 10, 20, 30, 60];
+export const DEFAULT_VIDEO_DURATION = 10;
+
 export const LENGTH_STOPS = [1, 2, 5, 10, 20, 50, 100];
 export const WIDTH_STOPS = [0.1, 0.2, 0.5, 1, 2, 5, 10];
 
@@ -68,12 +80,20 @@ const invert = <T extends string>(m: Record<T, string>) =>
 const SOURCE_BY_NAME = invert(SOURCE_NAMES);
 const TRAVERSAL_BY_NAME = invert(TRAVERSAL_NAMES);
 
+/** Mélange le trait et le fond : pct % de trait, le reste de fond (couleurs « #rrggbb »). */
+export function mixColor(bg: string, stroke: string, pct: number): string {
+  const a = Math.min(100, Math.max(0, pct)) / 100;
+  const ch = (c: string, i: number) => parseInt(c.slice(1 + 2 * i, 3 + 2 * i), 16);
+  return '#' + [0, 1, 2].map((i) => Math.round(ch(bg, i) * (1 - a) + ch(stroke, i) * a).toString(16).padStart(2, '0')).join('');
+}
+
 const num = (v: number) => String(Math.round(v * 1000) / 1000);
 const hex = (c: string) => c.replace('#', '').toLowerCase();
 
 /**
  * Paramètres → fragment d'adresse (sans le « # »). Le lien décrit le dessin : source, décimales (nombres),
- * longueur du segment, angle unitaire, sens du premier angle, couleurs du trait et du fond, épaisseur, plus
+ * longueur du segment, angle unitaire, sens du premier angle, couleurs du trait et du fond, épaisseur,
+ * prolongements (et leur intensité, s'ils sont activés), plus
  * ce qui est propre à la source (chiffres, texte, parcours de l'image) en fin de lien. Valeurs par défaut
  * comprises : le lien reste exact même si les valeurs par défaut changent un jour.
  * Hors lien : l'animation (vitesse) et les préférences d'affichage personnelles (langue, titre), de même que l'image.
@@ -88,7 +108,9 @@ export function encodeParams(p: Params): string {
     ['trait', hex(p.stroke)],
     ['fond', hex(p.bg)],
     ['epaisseur', num(p.strokeWidth)],
+    ['prolongements', p.extend ? 'oui' : 'non'],
   );
+  if (p.extend) parts.push(['intensite', String(p.extendIntensity)]);
   if (p.source === 'free') parts.push(['chiffres', p.freeDigits]);
   if (p.source === 'text') parts.push(['texte', p.text]);
   if (p.source === 'image') parts.push(['parcours', TRAVERSAL_NAMES[p.traversal]]);
@@ -142,6 +164,8 @@ export function decodeParams(s: string): Params | null {
       case 'segment': raw.segLen = number(); break;
       case 'sens': raw.firstDir = val === 'horaire' ? 1 : val === 'anti-horaire' || val === 'antihoraire' ? -1 : undefined; break;
       case 'epaisseur': raw.strokeWidth = number(); break;
+      case 'prolongements': raw.extend = val === 'oui'; break;
+      case 'intensite': raw.extendIntensity = number(); break;
       case 'trait': raw.stroke = hexColor(val); break;
       case 'fond': raw.bg = hexColor(val); break;
       default: continue; // clé inconnue
@@ -178,6 +202,8 @@ export function sanitize(o: Partial<Params> | Record<string, unknown>): Params {
     coef: clamp(x.coef, -360, 360, d.coef),
     firstDir: x.firstDir === 1 ? 1 : -1,
     strokeWidth: clamp(x.strokeWidth, 0.1, 50, d.strokeWidth),
+    extend: x.extend === true,
+    extendIntensity: Math.round(clamp(x.extendIntensity, 5, 100, d.extendIntensity)),
     stroke: color(x.stroke, d.stroke),
     bg: color(x.bg, d.bg),
     freeDigits: typeof x.freeDigits === 'string' ? x.freeDigits.slice(0, MAX_COUNT) : d.freeDigits,

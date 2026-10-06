@@ -1,10 +1,13 @@
 import type { Bounds } from './viewport';
-import { drawPath, type DrawStyle } from './canvas';
+import { drawPath, type DrawStyle, type ExtendStyle } from './canvas';
+import { extendedLines } from '../geometry/extend';
 
 export interface ExportInput {
   points: Float64Array;
   bounds: Bounds;
   style: DrawStyle;
+  /** Prolongements des segments (undefined = aucun). */
+  extend?: ExtendStyle;
   /** Lignes de légende imprimées sous le tracé (null = aucune). */
   title?: string[] | null;
   /** Nom de fichier sans extension. */
@@ -13,7 +16,7 @@ export interface ExportInput {
 
 const pad = (b: Bounds, style: DrawStyle) => Math.max(style.strokeWidth, (b.maxX - b.minX + b.maxY - b.minY) * 0.02);
 
-function framing(inp: ExportInput) {
+export function framing(inp: ExportInput) {
   const p = pad(inp.bounds, inp.style);
   const minX = inp.bounds.minX - p;
   const minY = inp.bounds.minY - p;
@@ -29,12 +32,32 @@ function framing(inp: ExportInput) {
   return { minX, minY, w, h: drawH + band, drawH, fontSize, gap, baselines, sizes };
 }
 
-function download(blob: Blob, name: string) {
+export type Framing = ReturnType<typeof framing>;
+
+/** Zone du dessin sans le bandeau de légende, dans le repère du dessin. */
+const drawingRect = (f: Framing) => ({ minX: f.minX, minY: f.minY, maxX: f.minX + f.w, maxY: f.minY + f.drawH });
+
+/** Télécharge un fichier généré dans le navigateur. */
+export function download(blob: Blob, name: string) {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = name;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+
+/**
+ * Dessine l'œuvre exportée (fond, prolongements, `segments` segments du tracé, légende) sur un canvas
+ * de cw × ch pixels, à l'échelle `k` (pixels par unité du dessin). Commun au PNG et à la vidéo.
+ */
+export function paintExport(ctx: CanvasRenderingContext2D, inp: ExportInput, f: Framing, k: number, cw: number, ch: number, segments: number) {
+  drawPath(ctx, inp.points, segments, inp.style, k, -f.minX * k, -f.minY * k, cw, ch, { extend: inp.extend, drawHeight: f.drawH * k });
+  inp.title?.forEach((line, i) => {
+    ctx.fillStyle = inp.style.stroke;
+    ctx.font = `${f.sizes[i] * k}px Helvetica, Arial, sans-serif`;
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText(line, (inp.bounds.minX - f.minX) * k, (f.baselines[i] - f.minY) * k);
+  });
 }
 
 /** PNG dont le grand côté fait `longSide` pixels. */
@@ -46,15 +69,7 @@ export async function exportPng(inp: ExportInput, longSide: number, name = `${in
   const canvas = document.createElement('canvas');
   canvas.width = cw;
   canvas.height = ch;
-  const ctx = canvas.getContext('2d')!;
-  const n = inp.points.length / 2 - 1;
-  drawPath(ctx, inp.points, n, inp.style, k, -f.minX * k, -f.minY * k, cw, ch);
-  inp.title?.forEach((line, i) => {
-    ctx.fillStyle = inp.style.stroke;
-    ctx.font = `${f.sizes[i] * k}px Helvetica, Arial, sans-serif`;
-    ctx.textBaseline = 'alphabetic';
-    ctx.fillText(line, (inp.bounds.minX - f.minX) * k, (f.baselines[i] - f.minY) * k);
-  });
+  paintExport(canvas.getContext('2d')!, inp, f, k, cw, ch, inp.points.length / 2 - 1);
   const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, 'image/png'));
   if (blob) download(blob, name);
 }
@@ -68,12 +83,23 @@ export function exportSvg(inp: ExportInput, name = `${inp.fileBase}.svg`) {
     `<?xml version="1.0" encoding="UTF-8"?>\n` +
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${r(f.minX)} ${r(f.minY)} ${r(f.w)} ${r(f.h)}" width="100%" height="100%" preserveAspectRatio="xMidYMid meet">` +
     `<rect x="${r(f.minX)}" y="${r(f.minY)}" width="${r(f.w)}" height="${r(f.h)}" fill="${inp.style.bg}"/>` +
+    svgExtension(inp, f) +
     `<polyline fill="none" stroke="${inp.style.stroke}" stroke-width="${inp.style.strokeWidth}" stroke-linejoin="round" stroke-linecap="round" points="${pts.join(' ')}"/>` +
     (inp.title ?? [])
       .map((line, i) => `<text x="${r(inp.bounds.minX)}" y="${r(f.baselines[i])}" font-family="Helvetica, Arial, sans-serif" font-size="${r(f.sizes[i])}" fill="${inp.style.stroke}">${esc(line)}</text>`)
       .join('') +
     `</svg>`;
   download(new Blob([svg], { type: 'image/svg+xml' }), name);
+}
+
+/** Prolongements en un seul <path>, découpés par la zone du dessin (la légende n'est pas traversée). */
+function svgExtension(inp: ExportInput, f: Framing): string {
+  if (!inp.extend) return '';
+  const lines = extendedLines(inp.points, inp.extend.count, drawingRect(f));
+  if (!lines.length) return '';
+  const d: string[] = [];
+  for (let i = 0; i < lines.length; i += 4) d.push(`M${r(lines[i])} ${r(lines[i + 1])}L${r(lines[i + 2])} ${r(lines[i + 3])}`);
+  return `<path fill="none" stroke="${inp.extend.color}" stroke-width="${r(inp.extend.width)}" d="${d.join('')}"/>`;
 }
 
 const r = (v: number) => Math.round(v * 1000) / 1000;
@@ -100,6 +126,18 @@ export async function exportPdf(inp: ExportInput, name = `${inp.fileBase}.pdf`) 
   doc.setLineWidth(Math.max(0.05, inp.style.strokeWidth * k));
   doc.setLineJoin('round');
   doc.setLineCap('round');
+
+  if (inp.extend) {
+    const lines = extendedLines(inp.points, inp.extend.count, drawingRect(f));
+    const [er, eg, eb] = hex(inp.extend.color);
+    doc.setDrawColor(er, eg, eb);
+    doc.setLineWidth(Math.max(0.05, inp.extend.width * k));
+    for (let i = 0; i < lines.length; i += 4) {
+      doc.line(lines[i] * k + ox, lines[i + 1] * k + oy, lines[i + 2] * k + ox, lines[i + 3] * k + oy);
+    }
+    doc.setDrawColor(sr, sg, sb);
+    doc.setLineWidth(Math.max(0.05, inp.style.strokeWidth * k));
+  }
 
   const n = inp.points.length / 2 - 1;
   const rel: [number, number][] = [];

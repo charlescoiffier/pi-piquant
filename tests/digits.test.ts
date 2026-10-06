@@ -7,7 +7,11 @@ import { decodeImage, fitImageSize, IMAGE_HEADER_DIGITS, IMAGE_MAX_PIXELS, image
 import { freeDigits } from '../src/digits/free';
 import { embeddedDigits } from '../src/digits/embedded';
 import { makeFileBase, makeSubtitle, makeTitle } from '../src/ui/title';
-import { decodeParams, DEFAULTS, encodeParams, sanitize, usesCount, withPersonalSettings } from '../src/ui/state';
+import { decodeParams, DEFAULTS, encodeParams, mixColor, sanitize, usesCount, withPersonalSettings } from '../src/ui/state';
+import { clipLine, extendedLines } from '../src/geometry/extend';
+import { BUILD, REPO_URL, versionLine, versionParts } from '../src/ui/version';
+import { pickVideoType } from '../src/render/video';
+import { drawPath } from '../src/render/canvas';
 
 const str = (d: Uint8Array) => Array.from(d).join('');
 const hist = (d: Uint8Array) => {
@@ -214,7 +218,7 @@ describe('divers', () => {
 
 describe('lien de partage lisible', () => {
   /** Réglages du dessin communs à toutes les sources, avec les valeurs par défaut. */
-  const DESSIN = (angle: number) => `segment=10&angle=${angle}&sens=anti-horaire&trait=111111&fond=ffffff&epaisseur=0.5`;
+  const DESSIN = (angle: number) => `segment=10&angle=${angle}&sens=anti-horaire&trait=111111&fond=ffffff&epaisseur=0.5&prolongements=non`;
   it('sans rien modifier, le lien décrit tous les réglages du dessin (valeurs par défaut comprises)', () => {
     expect(encodeParams({ ...DEFAULTS })).toBe('source=pi&decimales=100&' + DESSIN(10));
   });
@@ -252,7 +256,7 @@ describe('lien de partage lisible', () => {
   });
   it('les noms sont en français et les valeurs lisibles', () => {
     const l = encodeParams({ ...DEFAULTS, source: 'sqrt2', count: 64, coef: 51, firstDir: 1, stroke: '#CC3333' });
-    expect(l).toBe('source=racine2&decimales=64&segment=10&angle=51&sens=horaire&trait=cc3333&fond=ffffff&epaisseur=0.5');
+    expect(l).toBe('source=racine2&decimales=64&segment=10&angle=51&sens=horaire&trait=cc3333&fond=ffffff&epaisseur=0.5&prolongements=non');
   });
   it('texte lisible dans le lien : accents et guillemets conservés, séparateurs encodés, texte en fin de lien', () => {
     const l = encodeParams({ ...DEFAULTS, source: 'text', text: 'François & Co « Morellet »' });
@@ -310,5 +314,127 @@ describe('lien de partage lisible', () => {
   });
   it('aucun réglage reconnu (fragment vide, ancien lien #p=…, bruit) → null : ouverture aléatoire', () => {
     for (const s of ['', 'p=eyJzb3VyY2UiOiJwaSJ9', 'abc', '&&', 'foo=bar', '=1']) expect(decodeParams(s)).toBeNull();
+  });
+});
+
+describe('prolongements des segments', () => {
+  const R = { minX: 0, minY: 0, maxX: 10, maxY: 10 };
+  it('une droite horizontale ou verticale traverse tout le rectangle', () => {
+    expect(clipLine(3, 5, 1, 0, R)).toEqual([0, 5, 10, 5]);
+    expect(clipLine(4, 5, 0, -2, R)).toEqual([4, 10, 4, 0]);
+  });
+  it('une droite oblique est prolongée dans les deux sens jusqu\'aux bords', () => {
+    const c = clipLine(5, 5, 1, 1, R)!; // diagonale
+    expect(c.map((v) => Math.round(v * 1e6) / 1e6)).toEqual([0, 0, 10, 10]);
+    const d = clipLine(2, 5, 2, 1, R)!; // pente 1/2, passe par (2,5)
+    expect(d[0]).toBeCloseTo(0);
+    expect(d[1]).toBeCloseTo(4);
+    expect(d[2]).toBeCloseTo(10);
+    expect(d[3]).toBeCloseTo(9);
+  });
+  it('une droite qui rate le rectangle, ou parallèle à un bord hors du rectangle, donne null', () => {
+    expect(clipLine(0, 20, 1, 0, R)).toBeNull(); // horizontale au-dessus
+    expect(clipLine(20, 0, 0, 1, R)).toBeNull(); // verticale à droite
+    expect(clipLine(-5, 12, 1, 1, R)).toBeNull(); // oblique qui passe à côté du coin
+    expect(clipLine(5, 5, 0, 0, R)).toBeNull(); // direction nulle
+  });
+  it('un segment hors du rectangle est quand même prolongé jusqu\'à lui', () => {
+    const c = clipLine(-10, 5, 1, 0, R)!; // point de départ à gauche
+    expect(c).toEqual([0, 5, 10, 5]);
+  });
+  it('extendedLines : un prolongement par segment visible, count respecté', () => {
+    // tracé en L : (2,2) → (2,8) → (8,8)
+    const pts = Float64Array.from([2, 2, 2, 8, 8, 8]);
+    expect(Array.from(extendedLines(pts, 2, R))).toEqual([2, 0, 2, 10, 0, 8, 10, 8]);
+    expect(extendedLines(pts, 1, R).length).toBe(4);
+    expect(extendedLines(pts, 99, R).length).toBe(8); // plafonné au nombre de segments
+    expect(extendedLines(pts, 0, R).length).toBe(0);
+  });
+  it('mixColor : mélange du trait et du fond', () => {
+    expect(mixColor('#ffffff', '#000000', 0)).toBe('#ffffff');
+    expect(mixColor('#ffffff', '#000000', 100)).toBe('#000000');
+    expect(mixColor('#ffffff', '#000000', 30)).toBe('#b3b3b3');
+    expect(mixColor('#111111', '#f2f2f2', 50)).toBe('#828282');
+  });
+  it('lien : prolongements toujours écrits, intensité seulement s\'ils sont activés', () => {
+    const off = encodeParams({ ...DEFAULTS });
+    expect(off).toContain('&prolongements=non');
+    expect(off).not.toContain('intensite');
+    const on = encodeParams({ ...DEFAULTS, extend: true, extendIntensity: 50 });
+    expect(on).toContain('&prolongements=oui&intensite=50');
+    const p = decodeParams(on)!;
+    expect([p.extend, p.extendIntensity]).toEqual([true, 50]);
+  });
+  it('anciens liens sans prolongements : désactivés ; intensité hors bornes ramenée', () => {
+    expect(decodeParams('source=pi&decimales=50&angle=30')!.extend).toBe(false);
+    expect(decodeParams('source=pi&angle=30&prolongements=oui&intensite=500')!.extendIntensity).toBe(100);
+    expect(decodeParams('source=pi&angle=30&prolongements=oui&intensite=0')!.extendIntensity).toBe(5);
+  });
+});
+
+describe('version affichée', () => {
+  const b = { version: '0.2.0', commit: '017e7dd', date: '2026-10-06T08:30:00.000Z' };
+  it('ligne en français et en anglais', () => {
+    expect(versionLine('fr', b)).toBe('Version 0.2.0 · commit 017e7dd · 6 oct. 2026 · Code source');
+    expect(versionLine('en', b)).toBe('Version 0.2.0 · commit 017e7dd · 6 Oct 2026 · Source code');
+  });
+  it('le commit et le code source sont des liens vers GitLab', () => {
+    const parts = versionParts('fr', b);
+    expect(parts[1].href).toBe(`${REPO_URL}/-/commit/017e7dd`);
+    expect(parts[3].href).toBe(REPO_URL);
+    expect(parts[0].href).toBeUndefined();
+  });
+  it('hors build de production (commit « dev ») : pas de lien de commit', () => {
+    const parts = versionParts('fr', { ...b, commit: 'dev' });
+    expect(parts[1]).toEqual({ text: 'développement' });
+  });
+  it('la date ne dépend pas du fuseau horaire de la machine (UTC)', () => {
+    expect(versionLine('fr', { ...b, date: '2026-12-31T23:59:59.000Z' })).toContain('31 déc. 2026');
+  });
+  it('le build courant expose une version, un commit et une date valides', () => {
+    expect(BUILD.version).toMatch(/^\d+\.\d+\.\d+/);
+    expect(BUILD.commit.length).toBeGreaterThan(0);
+    expect(Number.isNaN(new Date(BUILD.date).getTime())).toBe(false);
+  });
+});
+
+describe('export vidéo', () => {
+  it('choisit MP4 quand le navigateur le sait enregistrer, sinon WebM, sinon rien', () => {
+    expect(pickVideoType(() => true)).toEqual({ mime: 'video/mp4;codecs=avc1', ext: 'mp4' });
+    expect(pickVideoType((m) => m.startsWith('video/webm'))).toEqual({ mime: 'video/webm;codecs=vp9', ext: 'webm' });
+    expect(pickVideoType((m) => m === 'video/webm')).toEqual({ mime: 'video/webm', ext: 'webm' });
+    expect(pickVideoType(() => false)).toBeNull();
+  });
+});
+
+describe('tracé progressif', () => {
+  /** Contexte factice : enregistre les points tracés. */
+  const fake = () => {
+    const calls: [string, number, number][] = [];
+    const ctx = {
+      save() {}, restore() {}, setTransform() {}, fillRect() {}, beginPath() {}, stroke() {},
+      moveTo: (x: number, y: number) => calls.push(['m', x, y]),
+      lineTo: (x: number, y: number) => calls.push(['l', x, y]),
+    } as unknown as CanvasRenderingContext2D;
+    return { ctx, calls };
+  };
+  const style = { stroke: '#000', bg: '#fff', strokeWidth: 1 };
+  const pts = Float64Array.from([0, 0, 10, 0, 10, 10]); // deux segments
+
+  it('un nombre entier de segments : aucun point supplémentaire', () => {
+    const { ctx, calls } = fake();
+    drawPath(ctx, pts, 1, style, 1, 0, 0, 100, 100);
+    expect(calls).toEqual([['m', 0, 0], ['l', 10, 0]]);
+  });
+  it('le segment en cours pousse : 1,5 segment s\'arrête au milieu du deuxième', () => {
+    const { ctx, calls } = fake();
+    drawPath(ctx, pts, 1.5, style, 1, 0, 0, 100, 100);
+    expect(calls).toEqual([['m', 0, 0], ['l', 10, 0], ['l', 10, 5]]);
+  });
+  it('tous les segments : le tracé complet, sans dépasser', () => {
+    const { ctx, calls } = fake();
+    drawPath(ctx, pts, 2, style, 1, 0, 0, 100, 100);
+    expect(calls.at(-1)).toEqual(['l', 10, 10]);
+    expect(calls.length).toBe(3);
   });
 });

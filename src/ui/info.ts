@@ -1,4 +1,5 @@
 import { strings } from './i18n';
+import { BUILD, versionParts } from './version';
 import type { Lang } from './state';
 
 const SITE = 'https://francoismorellet.com/';
@@ -55,7 +56,22 @@ export function createInfo(host: HTMLElement, getLang: () => Lang) {
     actions.className = 'right';
     actions.append(btn);
 
-    dlg.append(h, ...paras, linkP, actions);
+    // ligne discrète : version, commit (lien), date de build, code source (lien)
+    const version = document.createElement('p');
+    version.className = 'version';
+    versionParts(getLang(), BUILD).forEach((part, i) => {
+      if (i) version.append(' · ');
+      if (part.href) {
+        const a = document.createElement('a');
+        a.href = part.href;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        a.textContent = part.text;
+        version.append(a);
+      } else version.append(part.text);
+    });
+
+    dlg.append(h, ...paras, linkP, version, actions);
     overlay.replaceChildren(dlg);
     overlay.hidden = false;
     btn.focus();
