@@ -156,9 +156,8 @@ button.info {
 }
 .info-tabs button:hover { color: var(--ink); background: none; }
 .info-tabs button[aria-selected=true] { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
-.info-panels { display: grid; flex: 1; min-height: 0; overflow-y: auto; align-content: start; padding-right: 4px; }
-.info-panel { grid-area: 1 / 1; min-width: 0; }
-.info-panel[hidden] { display: block; visibility: hidden; } /* garde la place : la fenêtre ne change pas de hauteur */
+.info-panels { flex: 1; min-height: 0; overflow-y: auto; padding-right: 4px; } /* fenêtre à hauteur fixe : seul le panneau actif est affiché */
+.info-panel { min-width: 0; }
 .info-dialog h3 { margin: 14px 0 8px; }
 .shortcuts { display: grid; grid-template-columns: max-content 1fr; gap: 7px 14px; margin: 0; align-items: baseline; }
 .shortcuts dt { white-space: nowrap; }

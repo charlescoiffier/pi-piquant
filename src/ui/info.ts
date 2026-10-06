@@ -72,7 +72,7 @@ export function createInfo(host: HTMLElement, getLang: () => Lang) {
       { id: 'app', label: t.tabApp, content: app },
     ];
     const tabs = defs.map((d) => el('button', { type: 'button', role: 'tab', id: `info-tab-${d.id}`, 'aria-controls': `info-panel-${d.id}` }, d.label));
-    // les deux panneaux occupent la même cellule : la fenêtre garde la hauteur du plus grand et ne saute pas d'un onglet à l'autre
+    // la fenêtre a une hauteur fixe : un seul panneau est affiché, et il défile seul si nécessaire
     const panels = defs.map((d) => el('div', { class: 'info-panel', role: 'tabpanel', id: `info-panel-${d.id}`, 'aria-labelledby': `info-tab-${d.id}` }, ...d.content));
     const select = (i: number, focus = false) => {
       tabs.forEach((tab, k) => {

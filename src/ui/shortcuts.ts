@@ -4,8 +4,8 @@ import type { Source } from './state';
 export type ShortcutAction =
   | { type: 'count'; delta: number } // ↑ ↓ : décimales (Maj : par 10)
   | { type: 'angle'; delta: number } // ← → : angle unitaire (Maj : par 10°)
-  | { type: 'length'; dir: 1 | -1 } // Cmd/Ctrl + Opt/Alt + ↑ ↓ : longueur du segment (crans)
-  | { type: 'width'; dir: 1 | -1 } // Cmd/Ctrl + Opt/Alt + ← → : épaisseur du trait (crans)
+  | { type: 'length'; dir: 1 | -1 } // Cmd/Ctrl + Maj + ↑ ↓ : longueur du segment (crans)
+  | { type: 'width'; dir: 1 | -1 } // Cmd/Ctrl + Maj + ← → : épaisseur du trait (crans)
   | { type: 'source'; source: Source } // 1 à 4
   | { type: 'play' } // Espace
   | { type: 'restart' } // Début
@@ -40,15 +40,15 @@ const NUMBER_SOURCES: Source[] = ['pi', 'e', 'phi', 'sqrt2'];
 
 /**
  * Touche → action, ou null si la touche n'est pas un raccourci.
- *  - Les seules combinaisons avec modificateurs : Cmd/Ctrl + Opt/Alt + flèches (longueur du segment, épaisseur).
- *    Cmd/Ctrl seul ou Alt seul ne déclenchent jamais rien : on ne masque aucun raccourci du navigateur (Cmd+L, Cmd+R…).
+ *  - La seule combinaison avec modificateurs : Cmd/Ctrl + Maj + flèches (longueur du segment, épaisseur).
+ *    Cmd/Ctrl seul ou Alt ne déclenchent jamais rien : on ne masque aucun raccourci du navigateur (Cmd+L, Cmd+R…).
  *  - Les chiffres se lisent avec `code` : sur un clavier AZERTY, 1 à 4 fonctionnent sans Maj.
  *  - Les signes (+ − < > ?) se lisent avec `key`, donc selon la disposition du clavier.
  */
 export function shortcutFor(e: KeyInfo): ShortcutAction | null {
-  const mod = e.ctrlKey || e.metaKey;
-  if (mod && e.altKey) {
-    if (e.shiftKey) return null;
+  if (e.altKey) return null;
+  if (e.ctrlKey || e.metaKey) {
+    if (!e.shiftKey) return null;
     switch (e.key) {
       case 'ArrowUp': return { type: 'length', dir: 1 };
       case 'ArrowDown': return { type: 'length', dir: -1 };
@@ -57,7 +57,6 @@ export function shortcutFor(e: KeyInfo): ShortcutAction | null {
     }
     return null;
   }
-  if (mod || e.altKey) return null;
   const step = e.shiftKey ? 10 : 1;
   switch (e.key) {
     case 'ArrowUp': return { type: 'count', delta: step };

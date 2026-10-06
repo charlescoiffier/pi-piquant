@@ -50,8 +50,8 @@ const dict = {
         { title: 'Tracé', items: [
           { keys: '↑ / ↓', text: 'Ajouter ou retirer une décimale (Maj : par 10). Pour π, e, φ et √2.' },
           { keys: '← / →', text: 'Diminuer ou augmenter l’angle unitaire de 1° (Maj : de 10°).' },
-          { keys: 'Cmd / Ctrl + Opt / Alt + ↑ / ↓', text: 'Longueur du segment : cran suivant ou précédent.' },
-          { keys: 'Cmd / Ctrl + Opt / Alt + ← / →', text: 'Épaisseur du trait : cran précédent ou suivant.' },
+          { keys: 'Cmd / Ctrl + Maj + ↑ / ↓', text: 'Longueur du segment : cran suivant ou précédent.' },
+          { keys: 'Cmd / Ctrl + Maj + ← / →', text: 'Épaisseur du trait : cran précédent ou suivant.' },
           { keys: '1 / 2 / 3 / 4', text: 'Choisir la source : π, e, φ ou √2.' },
         ] },
         { title: 'Animation et vue', items: [
@@ -134,8 +134,8 @@ const dict = {
         { title: 'Path', items: [
           { keys: '↑ / ↓', text: 'Add or remove a decimal (Shift: by 10). For π, e, φ and √2.' },
           { keys: '← / →', text: 'Decrease or increase the unit angle by 1° (Shift: by 10°).' },
-          { keys: 'Cmd / Ctrl + Opt / Alt + ↑ / ↓', text: 'Segment length: next or previous step.' },
-          { keys: 'Cmd / Ctrl + Opt / Alt + ← / →', text: 'Stroke width: previous or next step.' },
+          { keys: 'Cmd / Ctrl + Shift + ↑ / ↓', text: 'Segment length: next or previous step.' },
+          { keys: 'Cmd / Ctrl + Shift + ← / →', text: 'Stroke width: previous or next step.' },
           { keys: '1 / 2 / 3 / 4', text: 'Choose the source: π, e, φ or √2.' },
         ] },
         { title: 'Animation and view', items: [

@@ -504,7 +504,7 @@ describe('modale d\'information : textes des deux onglets', () => {
   });
   it('tous les raccourcis annoncés sont dans la liste', () => {
     const keys = flat(fr).map((x) => x.keys);
-    for (const attendu of ['↑ / ↓', '← / →', 'Cmd / Ctrl + Opt / Alt + ↑ / ↓', 'Cmd / Ctrl + Opt / Alt + ← / →', '1 / 2 / 3 / 4', 'Espace', 'Début / Fin', '< / >', '+ / −', '0', 'S', 'D', 'P', 'T', 'L', 'E', 'V', 'Cmd / Ctrl + V', 'H', '?', 'Échap'])
+    for (const attendu of ['↑ / ↓', '← / →', 'Cmd / Ctrl + Maj + ↑ / ↓', 'Cmd / Ctrl + Maj + ← / →', '1 / 2 / 3 / 4', 'Espace', 'Début / Fin', '< / >', '+ / −', '0', 'S', 'D', 'P', 'T', 'L', 'E', 'V', 'Cmd / Ctrl + V', 'H', '?', 'Échap'])
       expect(keys).toContain(attendu);
   });
 });
@@ -521,8 +521,8 @@ describe('raccourcis clavier', () => {
     expect(shortcutFor(k('ArrowRight'))).toEqual({ type: 'angle', delta: 1 });
     expect(shortcutFor(k('ArrowLeft', { shiftKey: true }))).toEqual({ type: 'angle', delta: -10 });
   });
-  it('Cmd ou Ctrl + Opt ou Alt + flèches : longueur du segment (↑ ↓) et épaisseur du trait (← →)', () => {
-    for (const mod of [{ metaKey: true, altKey: true }, { ctrlKey: true, altKey: true }]) {
+  it('Cmd ou Ctrl + Maj + flèches : longueur du segment (↑ ↓) et épaisseur du trait (← →)', () => {
+    for (const mod of [{ metaKey: true, shiftKey: true }, { ctrlKey: true, shiftKey: true }]) {
       expect(shortcutFor(k('ArrowUp', mod))).toEqual({ type: 'length', dir: 1 });
       expect(shortcutFor(k('ArrowDown', mod))).toEqual({ type: 'length', dir: -1 });
       expect(shortcutFor(k('ArrowRight', mod))).toEqual({ type: 'width', dir: 1 });
@@ -567,15 +567,16 @@ describe('raccourcis clavier', () => {
     expect(shortcutFor(k('?', { shiftKey: true }))).toEqual({ type: 'info' });
     expect(shortcutFor(k('Escape'))).toEqual({ type: 'escape' });
   });
-  it('Cmd/Ctrl seul ou Alt seul ne déclenchent rien (Cmd+L, Cmd+R, Cmd+↑… restent au navigateur)', () => {
+  it('Cmd/Ctrl seul ou Alt ne déclenchent rien (Cmd+L, Cmd+R, Cmd+↑… restent au navigateur)', () => {
     for (const key of ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'l', 'r', 'h', 's', 'e', 'v', 'd', 'p', 't', ' ', '+', '-', 'Home', 'End', '?'])
       for (const mod of [{ metaKey: true }, { ctrlKey: true }, { altKey: true }]) expect(shortcutFor(k(key, mod))).toBeNull();
     expect(shortcutFor(code('Digit1', '1', { metaKey: true }))).toBeNull();
     expect(shortcutFor(code('Digit1', '1', { altKey: true }))).toBeNull();
   });
-  it('Cmd/Ctrl + Opt/Alt : seulement les flèches, sans Maj', () => {
-    expect(shortcutFor(k('ArrowUp', { metaKey: true, altKey: true, shiftKey: true }))).toBeNull();
-    for (const key of ['l', 's', 'h', ' ', '+', 'Home', '?']) expect(shortcutFor(k(key, { metaKey: true, altKey: true }))).toBeNull();
+  it('Cmd/Ctrl + Maj : seulement les flèches ; avec Alt en plus, rien', () => {
+    for (const key of ['l', 's', 'h', ' ', '+', 'Home', '?', 'E']) expect(shortcutFor(k(key, { metaKey: true, shiftKey: true }))).toBeNull();
+    expect(shortcutFor(k('ArrowUp', { metaKey: true, shiftKey: true, altKey: true }))).toBeNull();
+    expect(shortcutFor(k('ArrowUp', { metaKey: true, altKey: true }))).toBeNull(); // l'ancienne combinaison ne fait plus rien
   });
   it('touches sans raccourci', () => {
     for (const key of ['a', 'z', 'x', 'Enter', 'Tab', 'F5', 'Shift', 'Control']) expect(shortcutFor(k(key))).toBeNull();

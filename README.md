@@ -83,8 +83,8 @@ Chaque réglage fait au clavier est rappelé dans la barre du bas (« Nb de déc
 |---|---|---|
 | Tracé | `↑` / `↓` | Ajouter ou retirer une décimale (`Maj` : par 10) ; pour π, e, φ et √2. |
 | | `←` / `→` | Diminuer ou augmenter l'angle unitaire de 1° (`Maj` : de 10°). |
-| | `Cmd` / `Ctrl` + `Opt` / `Alt` + `↑` / `↓` | Longueur du segment : cran suivant ou précédent. |
-| | `Cmd` / `Ctrl` + `Opt` / `Alt` + `←` / `→` | Épaisseur du trait : cran précédent ou suivant. |
+| | `Cmd` / `Ctrl` + `Maj` + `↑` / `↓` | Longueur du segment : cran suivant ou précédent. |
+| | `Cmd` / `Ctrl` + `Maj` + `←` / `→` | Épaisseur du trait : cran précédent ou suivant. |
 | | `1` / `2` / `3` / `4` | Choisir la source : π, e, φ ou √2 (sans `Maj` sur un clavier AZERTY, pavé numérique compris). |
 | Animation et vue | `Espace` | Lancer ou mettre en pause l'animation. |
 | | `Début` / `Fin` | Recommencer au premier segment / afficher tout le tracé. |
@@ -260,9 +260,8 @@ reste au-dessus de la poignée (`Viewport.fit` accepte des marges haute et basse
 ## Modale d'information
 
 `src/ui/info.ts` construit une modale à deux onglets selon le motif ARIA (`tablist`, `tab`, `tabpanel`) : navigation aux
-flèches gauche et droite, `Début` et `Fin`, un seul onglet dans l'ordre de tabulation (tabindex itinérant). Les deux
-panneaux occupent la même cellule d'une grille (`visibility: hidden` pour l'inactif) : la fenêtre garde la hauteur du plus
-grand et ne saute pas d'un onglet à l'autre. Les textes sont dans `src/ui/i18n.ts` (`info`), dont la liste des
+flèches gauche et droite, `Début` et `Fin`, un seul onglet dans l'ordre de tabulation (tabindex itinérant). La fenêtre a une
+hauteur fixe et un seul panneau est affiché (`hidden`) : l'ascenseur n'apparaît que si le contenu déborde. Les textes sont dans `src/ui/i18n.ts` (`info`), dont la liste des
 raccourcis (`shortcutGroups` : cinq groupes, une entrée par raccourci, les touches étant rendues en `<kbd>`) ; un test
 vérifie que les deux langues restent synchronisées. Les panneaux défilent seuls : les onglets et le bouton « Fermer »
 restent visibles.
@@ -272,8 +271,8 @@ restent visibles.
 `shortcutFor` (`src/ui/shortcuts.ts`, fonction pure testée) traduit une touche en `ShortcutAction` ; `runShortcut`
 (`src/main.ts`) l'applique avec les mêmes fonctions que les boutons (`showAll`, `copyLink`, `exportPngAt`, `togglePlay`…).
 Règles :
-- la seule combinaison avec modificateurs est **`Cmd`/`Ctrl` + `Opt`/`Alt` + flèches** (longueur du segment, épaisseur) ;
-  `Cmd`/`Ctrl` seul ou `Alt` seul ne déclenchent jamais rien, pour ne masquer aucun raccourci du navigateur (`Cmd`+`L`,
+- la seule combinaison avec modificateurs est **`Cmd`/`Ctrl` + `Maj` + flèches** (longueur du segment, épaisseur) ;
+  `Cmd`/`Ctrl` seul ou `Alt` ne déclenchent jamais rien, pour ne masquer aucun raccourci du navigateur (`Cmd`+`L`,
   `Cmd`+`R`, `Cmd`+`S`…) ;
 - les **chiffres** se lisent avec `event.code` (`Digit1`, `Numpad1`…) : ils fonctionnent sans `Maj` sur un clavier AZERTY ;
   les signes (`+ − < > ?`) se lisent avec `event.key`, donc selon la disposition du clavier ;
