@@ -1,3 +1,6 @@
+> [!WARNING]
+> Ce projet a été vibecodé avec l’aide de l’intelligence artificielle.
+
 # π-piquant
 
 [![CI](https://github.com/charlescoiffier/pi-piquant/actions/workflows/ci.yml/badge.svg)](https://github.com/charlescoiffier/pi-piquant/actions/workflows/ci.yml)
