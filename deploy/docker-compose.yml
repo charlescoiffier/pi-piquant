@@ -1,0 +1,27 @@
+# Modèle de déploiement pour pi-piquant.charlescoiffier.fr (généré par scripts/new-site.sh)
+# Copié automatiquement sur le VPS dans ~/srv/pi-piquant/ à chaque déploiement.
+# Variables d'environnement de l'appli : fichier ~/srv/pi-piquant/.env sur le VPS (optionnel, jamais commité).
+services:
+  app:
+    image: ghcr.io/charlescoiffier/pi-piquant:latest
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    networks: [web]
+    # Garde-fous : une appli qui s'emballe ne doit pas faire tomber les autres sites (VPS : 1 cœur, 3,8 Go)
+    mem_limit: 256m
+    cpus: 0.5
+    pids_limit: 200
+    security_opt:
+      - no-new-privileges:true
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=web
+      - traefik.http.routers.pi-piquant.rule=Host(`pi-piquant.charlescoiffier.fr`)
+      - traefik.http.routers.pi-piquant.tls.certresolver=le
+      - traefik.http.services.pi-piquant.loadbalancer.server.port=8080
+
+networks:
+  web:
+    external: true
