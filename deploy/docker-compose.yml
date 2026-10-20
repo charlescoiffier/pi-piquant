@@ -22,6 +22,28 @@ services:
       - traefik.http.routers.pi-piquant.tls.certresolver=le
       - traefik.http.services.pi-piquant.loadbalancer.server.port=8080
 
+  # API PNG (GET /api/png) : seconde image, mêmes garde-fous. Clé dans ~/srv/pi-piquant/api.env (API_KEY=…), jamais commitée.
+  # Un PNG de 4096 px occupe ~64 Mo : 512 Mo de mémoire laissent de la marge. Sans clé, l'API répond 503 à toute demande.
+  api:
+    image: ghcr.io/charlescoiffier/pi-piquant-api:latest
+    restart: unless-stopped
+    env_file:
+      - path: api.env
+        required: false
+    networks: [web]
+    mem_limit: 512m
+    cpus: 0.5
+    pids_limit: 200
+    security_opt:
+      - no-new-privileges:true
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=web
+      - traefik.http.routers.pi-piquant-api.rule=Host(`pi-piquant.charlescoiffier.fr`) && PathPrefix(`/api`)
+      - traefik.http.routers.pi-piquant-api.priority=100
+      - traefik.http.routers.pi-piquant-api.tls.certresolver=le
+      - traefik.http.services.pi-piquant-api.loadbalancer.server.port=8081
+
 networks:
   web:
     external: true

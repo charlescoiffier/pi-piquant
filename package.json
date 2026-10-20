@@ -9,14 +9,21 @@
     "preview": "vite preview",
     "test": "vitest run",
     "generate:digits": "vite-node scripts/generate-digits.ts",
-    "capture:readme": "node scripts/capture-readme.mjs"
+    "capture:readme": "node scripts/capture-readme.mjs",
+    "build:api": "esbuild src/api/server.ts --bundle --platform=node --format=esm --target=node22 --external:@napi-rs/canvas --external:jspdf --outfile=dist-api/server.js",
+    "start:api": "npm run build:api && node dist-api/server.js"
   },
   "devDependencies": {
+    "@types/node": "^22.20.5",
+    "esbuild": "^0.28.2",
     "jspdf": "^4.2.1",
     "puppeteer-core": "^25.12.0",
     "typescript": "^7.0.2",
     "vite": "^7.3.6",
     "vite-node": "^3.2.4",
     "vitest": "^3.2.7"
+  },
+  "dependencies": {
+    "@napi-rs/canvas": "^1.0.11"
   }
 }

@@ -203,11 +203,13 @@ les images du README. Application 100 % statique, aucun serveur.
 | `src/geometry/path.ts` | Règle de tracé (fonction pure) : chiffres → points. |
 | `src/geometry/extend.ts` | Prolongements (fonctions pures) : droite infinie ∩ rectangle (`clipLine`), prolongement de chaque segment (`extendedLines`). |
 | `src/digits/` | Sources de chiffres → `Uint8Array` de 0 à 9. `embedded.ts` (fichier JSON embarqué), `pi.ts` (API pi.delivery + cache IndexedDB, en secours), `constants.ts` (e, φ, √2, π calculés en BigInt), `free.ts`, `text.ts`, `image.ts`, `bytecode.ts` (octet ⇄ 3 chiffres). |
-| `src/render/` | `canvas.ts` (dessin, prolongements), `viewport.ts` (zoom, déplacement, pincement, cadrage), `export.ts` (PNG, SVG, PDF, JSON ; `paintExport` commun au PNG et à la vidéo), `video.ts` (enregistrement vidéo). |
+| `src/render/` | `canvas.ts` (dessin, prolongements), `viewport.ts` (zoom, déplacement, pincement, cadrage), `export.ts` (PNG, SVG, PDF, JSON ; `paintExport` commun au PNG, à la vidéo et à l'API), `video.ts` (enregistrement vidéo), `scene.ts` (légende et prolongements, communs à l'écran, aux exports et à l'API). |
+| `src/api/` | API PNG (Node, voir « API ») : `query.ts` (paramètres validés), `render.ts` (dessin sur canvas Node), `app.ts` (serveur HTTP, clé, file d'attente), `server.ts` (point d'entrée). |
 | `src/ui/` | `panel.ts` (fenêtre de réglages et feuille mobile), `info.ts` (modale à deux onglets), `i18n.ts` (FR/EN), `state.ts` (paramètres, bornes, lien), `title.ts` (légende et noms de fichiers), `version.ts` (version affichée), `layout.ts` (seuil mobile). |
 | `src/data/digits.json` | 100 000 chiffres de π, e, φ, √2 (400 Ko), généré par `scripts/generate-digits.ts`. |
 | `scripts/` | `generate-digits.ts` (données), `capture-readme.mjs` (images du README). |
 | `docs/images/` | Captures et GIF du README (générés par `npm run capture:readme`). |
+| `tests/api.test.ts` | Tests de l'API : paramètres refusés ou acceptés, image produite, clé, erreurs, file d'attente. |
 | `tests/digits.test.ts` | Tests : géométrie, prolongements, constantes, conversions, aller-retour texte/image, titre, paramètres et lien, version, tracé progressif. |
 
 ## Données de π et des constantes
@@ -384,6 +386,34 @@ Un lien est appliqué dans deux cas, gérés dans `src/main.ts` : changement du 
 ignoré dans les champs de saisie). `withPersonalSettings` conserve alors la vitesse, la langue et le titre de
 l'utilisateur ; à l'ouverture, la langue suit celle du navigateur. Le code d'encodage et de décodage est dans
 `encodeParams` / `decodeParams` (`src/ui/state.ts`).
+
+## API : image PNG à la demande
+
+Pour produire une image depuis un script, sans navigateur, le serveur expose `GET /api/png` (sur le site en ligne :
+`https://pi-piquant.charlescoiffier.fr/api/png`). L'image est celle du bouton « PNG » de l'application : mêmes calculs, même cadrage, même légende.
+
+```bash
+curl -H "Authorization: Bearer $PIPIQUANT_API_KEY" -o pi.png \
+  "https://pi-piquant.charlescoiffier.fr/api/png?source=pi&decimales=250&angle=17&prolongements=oui&taille=2048"
+```
+
+**Clé obligatoire**, dans l'en-tête `Authorization: Bearer <clé>`. Sans clé valide : 401. Sans clé configurée sur le serveur : 503 (jamais ouvert par défaut).
+
+**Paramètres** : tous facultatifs, mêmes noms et valeurs par défaut que le [lien de partage](#lien-de-partage) :
+`source` (`pi`, `e`, `phi`, `racine2`, `chiffres`, `texte` ; pas `image`), `decimales` (1 à 100 000, pour les nombres),
+`segment`, `angle` (virgule ou point), `sens` (`horaire`, `anti-horaire`), `trait` et `fond` (hexadécimal, 3 ou 6 chiffres),
+`epaisseur`, `prolongements` (`oui`/`non`) et `intensite` (5 à 100), `chiffres` et `texte` (selon la source). Trois paramètres sont propres à l'API :
+`taille` (grand côté en pixels, 64 à 4096, 2048 par défaut), `titre` (`oui`/`non`, légende sous le dessin) et `langue` (`fr`/`en`, de la légende).
+
+**Réponses** : `200` avec `image/png` ; `400` avec `{"error": "…"}` nommant le paramètre fautif (rien n'est corrigé en silence : paramètre inconnu, répété ou hors bornes) ;
+`401` ; `404` ; `405` ; `503` si trop de demandes sont en attente (en-tête `Retry-After`). `GET /api/health` répond `200` sans clé.
+
+**Fonctionnement** : `src/api/` (`query.ts` lit et valide les paramètres, `render.ts` dessine avec `@napi-rs/canvas` en réutilisant `geometry/`, `digits/` et
+`render/export.ts`, `app.ts` est le serveur HTTP, `server.ts` le point d'entrée). Les images sont produites une par une, avec au plus 4 demandes en attente.
+`npm run start:api` le lance en local (`API_KEY=… PORT=8081`, 16 caractères minimum pour la clé ; `MAX_SIZE` et `MAX_PENDING` règlent les limites).
+En ligne, c'est un second conteneur (`Dockerfile.api`, image `pi-piquant-api`) ajouté au `deploy/docker-compose.yml` : Traefik lui envoie uniquement `/api/*`.
+**La clé se pose sur le VPS**, dans `~/srv/pi-piquant/api.env` (`API_KEY=…`), jamais dans git ; puis `docker compose up -d` dans `~/srv/pi-piquant`.
+La limite de 4096 px (≈ 64 Mo de mémoire par image) tient dans les 512 Mo du conteneur ; `MAX_SIZE` peut la relever si la mémoire du conteneur augmente.
 
 ## Publication
 
