@@ -35,7 +35,7 @@ jobs:
         if: github.ref != 'refs/heads/main'
         uses: actions/upload-artifact@v4
         with:
-          name: pi-piquant-${{ github.ref_name }}
+          name: pi-piquant-dist
           path: dist
           retention-days: 7
       - name: Préparer GitHub Pages
@@ -60,3 +60,25 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  # L'image de l'API (Alpine, polices Liberation, canvas natif) est construite et essayée sans être publiée :
+  # on vérifie qu'elle démarre et produit un vrai PNG avec la légende avant tout déploiement.
+  api-image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f Dockerfile.api -t pi-piquant-api:ci .
+      - name: Démarrer l'API et demander une image
+        run: |
+          docker run -d --name api -p 8081:8081 -e API_KEY=cle-de-test-pour-la-ci pi-piquant-api:ci
+          for i in $(seq 1 20); do curl -sf http://127.0.0.1:8081/api/health >/dev/null && break; sleep 1; done
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8081/api/png)" = 401
+          curl -sf -H 'Authorization: Bearer cle-de-test-pour-la-ci' -o out.png 'http://127.0.0.1:8081/api/png?decimales=250&angle=17&taille=1000'
+          file out.png | tee /dev/stderr | grep -q 'PNG image data'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: api-exemple
+          path: out.png
+          retention-days: 7
+      - if: failure()
+        run: docker logs api

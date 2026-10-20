@@ -3,7 +3,8 @@ import { buildPath, segmentCount, type PathResult } from './geometry/path';
 import { getDigits, type ImageSource } from './digits';
 import { fitImageSize } from './digits/image';
 import { TEXT_MAX_BYTES, textBytes } from './digits/text';
-import { Stage, type ExtendStyle } from './render/canvas';
+import { Stage } from './render/canvas';
+import { extendStyleFor, titleLinesFor } from './render/scene';
 import { Viewport } from './render/viewport';
 import { download, exportParams, exportPdf, exportPng, exportSvg, type ExportInput } from './render/export';
 import { recordVideo, videoSupported } from './render/video';
@@ -11,8 +12,8 @@ import { createPanel } from './ui/panel';
 import { strings } from './ui/i18n';
 import { createInfo } from './ui/info';
 import { isMobile } from './ui/layout';
-import { makeFileBase, makeSubtitle, makeTitle } from './ui/title';
-import { DEFAULTS, EXTEND_MAX_SEGMENTS, LENGTH_STOPS, MAX_COUNT, SPEED_STOPS, WIDTH_STOPS, darkPatch, decodeParams, encodeParams, mixColor, sanitize, usesCount, withPersonalSettings, type Params } from './ui/state';
+import { makeFileBase } from './ui/title';
+import { DEFAULTS, EXTEND_MAX_SEGMENTS, LENGTH_STOPS, MAX_COUNT, SPEED_STOPS, WIDTH_STOPS, darkPatch, decodeParams, encodeParams, sanitize, usesCount, withPersonalSettings, type Params } from './ui/state';
 import { ignoresShortcut, shortcutFor, stepStop, type ShortcutAction } from './ui/shortcuts';
 
 const fromHash = () => {
@@ -50,7 +51,7 @@ const viewport = new Viewport(app, () => draw());
 const caption = document.createElement('div');
 caption.className = 'caption';
 app.append(caption);
-const titleLines = () => (params.showTitle && digits.length ? [makeTitle(params, digits.length), makeSubtitle(params.lang)] : null);
+const titleLines = () => titleLinesFor(params, digits.length);
 function updateCaption() {
   const lines = titleLines();
   const text = lines ? lines.join('\n') : '';
@@ -65,10 +66,7 @@ function syncShowAll() {
 }
 
 /** Prolongements des segments : trait mélangé au fond (jamais de transparence), quatre fois plus fin que le trait. */
-function extendStyle(): ExtendStyle | undefined {
-  if (!params.extend) return undefined;
-  return { count: EXTEND_MAX_SEGMENTS, color: mixColor(params.bg, params.stroke, params.extendIntensity), width: params.strokeWidth / 4 };
-}
+const extendStyle = () => extendStyleFor(params);
 
 function draw() {
   updateCaption();
