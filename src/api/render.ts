@@ -1,10 +1,18 @@
-import { createCanvas } from '@napi-rs/canvas';
+import { existsSync } from 'node:fs';
+import { createCanvas, GlobalFonts } from '@napi-rs/canvas';
 import { buildPath } from '../geometry/path';
 import { getDigits } from '../digits';
 import { framing, paintExport, type ExportInput } from '../render/export';
 import { extendStyleFor, titleLinesFor } from '../render/scene';
 import { makeFileBase } from '../ui/title';
 import type { PngRequest } from './query';
+
+// La légende se dessine en « Helvetica, Arial, sans-serif » (comme dans le navigateur). Un serveur Linux n'a pas ces polices
+// et Skia retomberait sur une police à chasse fixe : Liberation Sans (métriques d'Arial, avec le « π ») est déclarée sous le nom Helvetica.
+// Sur un poste qui a déjà Helvetica (macOS), rien à faire.
+for (const path of ['/usr/share/fonts/liberation/LiberationSans-Regular.ttf', '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf']) {
+  if (existsSync(path) && !GlobalFonts.has('Helvetica')) GlobalFonts.registerFromPath(path, 'Helvetica');
+}
 
 /**
  * Même chaîne que le bouton « PNG » de l'application (chiffres → tracé → cadrage → paintExport), sur un canvas Node.
