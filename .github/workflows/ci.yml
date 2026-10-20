@@ -35,7 +35,7 @@ jobs:
         if: github.ref != 'refs/heads/main'
         uses: actions/upload-artifact@v4
         with:
-          name: pi-piquant-${{ github.ref_name }}
+          name: pi-piquant-dist
           path: dist
           retention-days: 7
       - name: Préparer GitHub Pages
